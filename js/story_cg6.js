@@ -6,8 +6,8 @@ const DUSK = 'flag:cg_saw_house?cg_duskask';
 
 /* ---------- retarget the original city chapter to five days, twelve destinations ---------- */
 const city = G.chapters.cg3;
-city.text = `School holidays have begun. For the next five days, Singapore is your classroom.\nThe island is small enough to cross in an hour or two, and the MRT can take you almost anywhere: Orchard Road's shops, Chinatown's temples, Little India's late-night stores, the old Malay quarter of Kampong Glam, the stone dragons of Haw Par Villa, the beaches of Sentosa, the glittering Marina Bay, the airport's glass garden at Jewel, the green hush of the Botanic Gardens, the National Museum, the Science Centre and the Night Safari.\nYou cannot visit everywhere. Choose the five places you think will help the most.`;
-city.beats = ['cg3_plan','~enc','~enc','cg3_hub','~enc','~enc','cg3_eve1','cg3_hub','~enc','~enc','cg3_eve2','cg3_hub','~enc','~enc','cg3_eve3','cg3_hub','~enc','~enc','cg3_eve4','cg3_hub','~enc','~enc','cg3_prep',DUSK];
+city.text = `School holidays have begun. For the next three days, Singapore is your classroom.\nThe island is small enough to cross in an hour or two, and the MRT can take you almost anywhere: Orchard Road's shops, Chinatown's temples, Little India's late-night stores, the old Malay quarter of Kampong Glam, the stone dragons of Haw Par Villa, the beaches of Sentosa, the glittering Marina Bay, the airport's glass garden at Jewel, the green hush of the Botanic Gardens, the National Museum, the Science Centre and the Night Safari.\nYou cannot visit everywhere. Choose the three places you think will help the most.`;
+city.beats = ['cg3_plan','~enc','cg3_hub','~enc','cg3_eve1','cg3_hub','~enc','cg3_eve2','cg3_hub','~enc','cg3_prep',DUSK];
 
 /* ---------- BOTANIC GARDENS ---------- */
 S_('cg3_bot1','Singapore Botanic Gardens','park|🌳 🦢',
@@ -83,7 +83,7 @@ S_('cg3_zoo3','Creatures of the Night','cave|🦉 🌟',
 /* ---------- hub: add the four new destinations & rewrite the prep scene ---------- */
 const hub = G.scenes.cg3_hub;
 hub.text = S => { const n = ['cg_v_orchard','cg_v_chinatown','cg_v_littleindia','cg_v_glam','cg_v_hawpar','cg_v_sentosa','cg_v_marina','cg_v_jewel','cg_v_botanic','cg_v_museum','cg_v_science','cg_v_zoo'].filter(f=>S.flags[f]).length;
-  return `Day ${Math.min(5,n+1)} of 5. ${n===0?'Where should you start?':n<3?'Where next?':n<4?'Halfway there. Where now?':'The last day of the holidays. Where now?'}\nYou stand in front of the big MRT map at Tampines station. Your EZ-Link card is topped up. You have $${S.gold}.\nThe Downtown Line, in blue, goes right across the city. The East-West Line, in green, goes to the airport. The Circle Line, in orange, goes round the middle.`; };
+  return `Day ${Math.min(3,n+1)} of 3. ${n===0?'Where should you start?':n===1?'One place done. Where next?':'The last day of the holidays. Where now?'}\nYou stand in front of the big MRT map at Tampines station. Your EZ-Link card is topped up. You have $${S.gold}.\nThe Downtown Line, in blue, goes right across the city. The East-West Line, in green, goes to the airport. The Circle Line, in orange, goes round the middle.`; };
 const stay = hub.opts.pop();
 [['Botanic Gardens: a green oasis and a 160-year-old garden.','cg_v_botanic','cg3_bot1','You ride the Downtown Line to Botanic Gardens station.'],
  ['National Museum: the story of old Singapore.','cg_v_museum','cg3_mus1','A short ride on the Downtown Line to Bencoolen, then a walk.'],

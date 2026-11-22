@@ -109,7 +109,7 @@ function why(neg, parts){
     case 'anyally': return 'Needs a companion';
     case 'bond': return 'Needs a stronger bond with ' + (G.allies[v]?G.allies[v].n:v);
     case 'gold': return G.curStory==='changi' ? 'Needs $' + v : 'Needs ' + v + ' gold';
-    case 'mp': return 'Needs ' + v + ' MP';
+    case 'mp': return 'Needs ' + v + ' ' + mpName();
     case 'lvl': return 'Needs level ' + v;
     case 'time': return 'Only at ' + v;
     default: if (STATS.includes(k)) return 'Needs ' + k + ' ' + v; return 'Requirement not met';
@@ -290,6 +290,7 @@ const GEN_DIE = [
   'Darkness folds over you like a cloak, gently, and refuses to lift.'
 ];
 const GEN_DIE_CG = ['Everything goes soft and quiet, like falling asleep on the bus ride home. Your adventure ends here.','The lights flicker out one by one, and you feel very, very sleepy. This is where your story ends — for now.','A gentle mist wraps around you like a blanket, and the world fades to a hush. Your journey ends here.'];
+function mpName(S){ const st = G.stories[(S && S.story) || G.curStory || 'ashen'] || {}; return (st.labels && st.labels.mp) || 'MP'; }
 G.deathLine = S => { const st = G.stories[S.story||'ashen']||{}; const L = st.deathLines || (S.story==='changi' ? GEN_DIE_CG : GEN_DIE); return L[ri(S, L.length)]; };
 
 function applyFx(S, fx, R, o){
@@ -433,7 +434,7 @@ function runOpt(S, o, R){
 }
 function normOpt(S, raw){
   const rq = G.req(S, raw.r); let avail = rq.ok, wh = rq.why;
-  if (avail && raw.mp && S.mp < raw.mp){ avail = false; wh = 'Needs ' + raw.mp + ' MP'; }
+  if (avail && raw.mp && S.mp < raw.mp){ avail = false; wh = 'Needs ' + raw.mp + ' ' + mpName(S); }
   const o = { raw, label: fmt(S, raw.t), avail, why: wh, hide: !!raw.hide, mp: raw.mp||0, act: raw.act, safe: isSafe(raw), chk: null, pct: null, req: raw.r };
   if (raw.c){ o.chk = parseChk(raw.c); o.pct = chance(S, o.chk); }
   return o;

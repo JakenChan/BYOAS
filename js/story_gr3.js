@@ -228,6 +228,14 @@ function epi(S){
   if (fl('gr_eris_pardoned')) L.push('Eris is said to have a seat at every feast now, and has been, according to most accounts, almost well-behaved.');
   else if (fl('gr_eris_banished')) L.push('Eris, banished, still sends the occasional golden apple. Everyone has learned to leave it alone.');
   if (fl('gr_poseidon_boon')) L.push('A pearl, now and then, turns up at the edge of the sea, with your name on it.');
+  if (fl('gr_niko_restored')) L.push('Niko woke from his stone nap with a grin, and has been bragging about it ever since.');
+  else if (fl('gr_niko_stone')) L.push('Niko still stands on Gorgon Island, a grinning stone boy with his crook raised, waiting for someone to ask the right goddess.');
+  else if (fl('gr_niko_waits')) L.push('Niko waited at the boat, and has told everyone he ever met that he nearly saw a Gorgon.');
+  if (fl('gr_mara_ashore')) L.push('Mara met you at the shore, drenched and fuming, and has never let you forget the wave.');
+  else if (fl('gr_mara_lost') && !al('gr_mara')) L.push('Mara was lost to the sea, and some sailors say they hear her laughing in the swell.');
+  if (fl('gr_elena_forgot')) L.push('Elena stayed by the quiet river, smiling. Some travellers say she is still there, telling the shades about Homer.');
+  if (fl('gr_hourglass_lost')) L.push('The Hourglass of Chronos was never found, and time has had a slight tremor ever since.');
+  if (fl('gr_zeus_annoyed')) L.push('Zeus was never quite warm to you afterwards.');
   const names = ['gr_elena','gr_mara','gr_niko','gr_glaux'].filter(al).map(a=>G.allies[a].n.split(' ')[0]);
   if (names.length) L.push(names.join(', ') + ' will be part of your story as long as you tell it.');
   L.push('You made ' + S.choices + ' choices on this journey and reached level ' + S.lvl + '.');

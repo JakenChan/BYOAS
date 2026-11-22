@@ -347,7 +347,7 @@ function why(neg, parts){
     case 'anyally': return 'Needs a companion';
     case 'bond': return 'Needs a stronger bond with ' + (G.allies[v]?G.allies[v].n:v);
     case 'gold': return G.curStory==='changi' ? 'Needs $' + v : 'Needs ' + v + ' gold';
-    case 'mp': return 'Needs ' + v + ' MP';
+    case 'mp': return 'Needs ' + v + ' ' + mpName();
     case 'lvl': return 'Needs level ' + v;
     case 'time': return 'Only at ' + v;
     default: if (STATS.includes(k)) return 'Needs ' + k + ' ' + v; return 'Requirement not met';
@@ -528,6 +528,7 @@ const GEN_DIE = [
   'Darkness folds over you like a cloak, gently, and refuses to lift.'
 ];
 const GEN_DIE_CG = ['Everything goes soft and quiet, like falling asleep on the bus ride home. Your adventure ends here.','The lights flicker out one by one, and you feel very, very sleepy. This is where your story ends — for now.','A gentle mist wraps around you like a blanket, and the world fades to a hush. Your journey ends here.'];
+function mpName(S){ const st = G.stories[(S && S.story) || G.curStory || 'ashen'] || {}; return (st.labels && st.labels.mp) || 'MP'; }
 G.deathLine = S => { const st = G.stories[S.story||'ashen']||{}; const L = st.deathLines || (S.story==='changi' ? GEN_DIE_CG : GEN_DIE); return L[ri(S, L.length)]; };
 
 function applyFx(S, fx, R, o){
@@ -671,7 +672,7 @@ function runOpt(S, o, R){
 }
 function normOpt(S, raw){
   const rq = G.req(S, raw.r); let avail = rq.ok, wh = rq.why;
-  if (avail && raw.mp && S.mp < raw.mp){ avail = false; wh = 'Needs ' + raw.mp + ' MP'; }
+  if (avail && raw.mp && S.mp < raw.mp){ avail = false; wh = 'Needs ' + raw.mp + ' ' + mpName(S); }
   const o = { raw, label: fmt(S, raw.t), avail, why: wh, hide: !!raw.hide, mp: raw.mp||0, act: raw.act, safe: isSafe(raw), chk: null, pct: null, req: raw.r };
   if (raw.c){ o.chk = parseChk(raw.c); o.pct = chance(S, o.chk); }
   return o;
@@ -5436,7 +5437,7 @@ const G = globalThis.G;
 const S_ = (id, title, art, text, opts, extra) => G.sc(id, art, text, opts, Object.assign({ title }, extra||{}));
 const VISITED = ['cg_v_orchard','cg_v_chinatown','cg_v_littleindia','cg_v_glam','cg_v_hawpar','cg_v_sentosa','cg_v_marina','cg_v_jewel'];
 
-G.chapter('cg3',{ story:'changi', n:'Chapter 3: Across Singapore', sub:'The school holidays · five days to find something that helps', ch:3, region:'cg_city', art:'skyline|🚇 🌆', age:11, btn:'Start planning',
+G.chapter('cg3',{ story:'changi', n:'Chapter 3: Across Singapore', sub:'The school holidays · three days to find something that helps', ch:3, region:'cg_city', art:'skyline|🚇 🌆', age:11, btn:'Start planning',
   text:`School holidays have begun. You have three days before the fifteenth night of the seventh month, when the house will be at its strongest.\nSingapore is small enough to cross in an hour or two, and the MRT can take you almost anywhere: Orchard Road's shops, Chinatown's temples, Little India's late-night stores, the old Malay quarter of Kampong Glam, the stone dragons of Haw Par Villa, the beaches of Sentosa, the glittering Marina Bay, and the airport's glass garden at Jewel.\nYou cannot visit everywhere. Choose the three places you think will help the most.`,
   beats:['cg3_plan','~enc','cg3_hub','~enc','cg3_eve1','cg3_hub','cg3_eve2','~enc','cg3_hub','cg3_prep'] });
 
@@ -5644,7 +5645,7 @@ S_('cg4_gate','The Rusted Gate','bungalow|🚪 🔔',
  {t:`Ring the little brass bell three times.`,r:'item:cg_bell',y:[`Ting, ting, ting. The friendly sound rolls across the garden. The mist pauses, as if listening. The gate creaks open on its own.`,'xp+m mp+3 flag:cg_respect']},
  {t:`Push the gate open slowly and quietly.`,c:'DEX 9 sneak',y:[`You press the gate with two fingers. Not one squeak. You slip through and the gate whispers shut.`,'xp+m'],n:[`CREEEEAK! The whole garden seems to flinch. A cold gust brushes your face. But the path stays open.`,'hp-1 mp-2 xp+s']},
  {t:`Climb over the wall instead.`,c:'STR 10 climb',y:[`You scramble up, over and down. Gravel crunches. You are in.`,'xp+s flag:cg_rude'],n:[`Your shirt snags on the rusty top. You tumble down on the other side with a thump.`,'hp-3 mp-2 xp+s flag:cg_rude']},
- {t:`Step back and ask Uncle Lim to call the police.`,y:[`You walk back to the beach and tell everyone. Uncle Lim is calm. "We will wait for the police," he says. But when the police arrive, there is no house to see, only the casuarinas and the mist.`,'xp+m >cg_end_d']} ]);
+ {t:`Step back and ask Uncle Lim whether to call the police.`,y:[`You walk back to the beach. Uncle Lim shakes his head, very gently. "Policemen see only trees and mist," he says. "This house is only for those it chooses. You must go in yourself, or no one will." You straighten your shoulders and walk back to the gate.`,'xp+m mp+2']} ]);
 
 S_('cg4_garden','The Garden','bungalow|🌲 🛝',
 `Inside the gate, the garden is overgrown and silvery. An old rope swing sways in the casuarinas, though there is no wind. Frangipani trees drop pale flowers onto a mossy path. Tiny paper boats float on a shallow pond that should be dry. Your footsteps are loud on the gravel.\nSomething small and quick brushes past your ankle. A shadow? A cat? The air is thick with the sound of whispering leaves.`,[
@@ -6145,8 +6146,8 @@ const DUSK = 'flag:cg_saw_house?cg_duskask';
 
 /* ---------- retarget the original city chapter to five days, twelve destinations ---------- */
 const city = G.chapters.cg3;
-city.text = `School holidays have begun. For the next five days, Singapore is your classroom.\nThe island is small enough to cross in an hour or two, and the MRT can take you almost anywhere: Orchard Road's shops, Chinatown's temples, Little India's late-night stores, the old Malay quarter of Kampong Glam, the stone dragons of Haw Par Villa, the beaches of Sentosa, the glittering Marina Bay, the airport's glass garden at Jewel, the green hush of the Botanic Gardens, the National Museum, the Science Centre and the Night Safari.\nYou cannot visit everywhere. Choose the five places you think will help the most.`;
-city.beats = ['cg3_plan','~enc','~enc','cg3_hub','~enc','~enc','cg3_eve1','cg3_hub','~enc','~enc','cg3_eve2','cg3_hub','~enc','~enc','cg3_eve3','cg3_hub','~enc','~enc','cg3_eve4','cg3_hub','~enc','~enc','cg3_prep',DUSK];
+city.text = `School holidays have begun. For the next three days, Singapore is your classroom.\nThe island is small enough to cross in an hour or two, and the MRT can take you almost anywhere: Orchard Road's shops, Chinatown's temples, Little India's late-night stores, the old Malay quarter of Kampong Glam, the stone dragons of Haw Par Villa, the beaches of Sentosa, the glittering Marina Bay, the airport's glass garden at Jewel, the green hush of the Botanic Gardens, the National Museum, the Science Centre and the Night Safari.\nYou cannot visit everywhere. Choose the three places you think will help the most.`;
+city.beats = ['cg3_plan','~enc','cg3_hub','~enc','cg3_eve1','cg3_hub','~enc','cg3_eve2','cg3_hub','~enc','cg3_prep',DUSK];
 
 /* ---------- BOTANIC GARDENS ---------- */
 S_('cg3_bot1','Singapore Botanic Gardens','park|🌳 🦢',
@@ -6222,7 +6223,7 @@ S_('cg3_zoo3','Creatures of the Night','cave|🦉 🌟',
 /* ---------- hub: add the four new destinations & rewrite the prep scene ---------- */
 const hub = G.scenes.cg3_hub;
 hub.text = S => { const n = ['cg_v_orchard','cg_v_chinatown','cg_v_littleindia','cg_v_glam','cg_v_hawpar','cg_v_sentosa','cg_v_marina','cg_v_jewel','cg_v_botanic','cg_v_museum','cg_v_science','cg_v_zoo'].filter(f=>S.flags[f]).length;
-  return `Day ${Math.min(5,n+1)} of 5. ${n===0?'Where should you start?':n<3?'Where next?':n<4?'Halfway there. Where now?':'The last day of the holidays. Where now?'}\nYou stand in front of the big MRT map at Tampines station. Your EZ-Link card is topped up. You have $${S.gold}.\nThe Downtown Line, in blue, goes right across the city. The East-West Line, in green, goes to the airport. The Circle Line, in orange, goes round the middle.`; };
+  return `Day ${Math.min(3,n+1)} of 3. ${n===0?'Where should you start?':n===1?'One place done. Where next?':'The last day of the holidays. Where now?'}\nYou stand in front of the big MRT map at Tampines station. Your EZ-Link card is topped up. You have $${S.gold}.\nThe Downtown Line, in blue, goes right across the city. The East-West Line, in green, goes to the airport. The Circle Line, in orange, goes round the middle.`; };
 const stay = hub.opts.pop();
 [['Botanic Gardens: a green oasis and a 160-year-old garden.','cg_v_botanic','cg3_bot1','You ride the Downtown Line to Botanic Gardens station.'],
  ['National Museum: the story of old Singapore.','cg_v_museum','cg3_mus1','A short ride on the Downtown Line to Bencoolen, then a walk.'],
@@ -6741,6 +6742,56 @@ Object.keys(PAIRS).forEach(id=>{
     if (pos >= 0) b.splice(pos, 0, ...trig); else b.push(...trig);
     return b; };
 });
+})();
+
+</script>
+<script>
+/* THE ASHEN QUEEN — adventure pack: gold now buys survival, safe passage and blessings; fewer quiet filler encounters in the school years. */
+(function(){
+const G = globalThis.G;
+const o = (t, y, fx, req) => [t,'',y,fx||'xp+s','','',req||''];
+const c = (t, chk, y, fx, n, nfx, req) => [t,chk,y,fx||'xp+m',n||'It does not quite work out.',nfx||'xp+s',req||''];
+
+G.miniArch('toll', [
+['any','Ferry Toll','⛴️',`The road ends at a wide, brown river. A ferryman with forearms like ropes leans on his pole beside a flat-bottomed boat. "Twenty-five gold for the crossing," he says. "Or swim. The river takes whoever it likes."`,[
+  o('Pay the 25 gold.',`The ferry glides across smoothly. On the far bank, you step off dry and unhurried, and the ferryman waves you on.`,'gold-25 xp+m hp+m','gold:25'),
+  c('Swim for it.','STR 11 endure',`You fight the current, stroke by stroke, and haul yourself onto the far bank, gasping and proud.`,'xp+l','The river drags you under twice. You crawl out half a mile downstream, battered and soaked.','xp+s hp-m'),
+  o('Follow the bank to the old ford.',`It takes half a day, but the ford is shallow and safe. Your feet are wet, your pride is intact.`,'xp+s')]],
+['any','Guide for Hire','🧭',`A weathered woman in a patched cloak sits on a milestone, whittling. "Know these hills like my own palm," she says. "Thirty gold, and I will walk you through. Without me, you will find the bad ground first."`,[
+  o('Hire her for 30 gold.',`She leads you along a path nobody else uses. You pass a bandit ambush, a rockfall and a sleeping bear without anyone knowing you were there. By evening, you are rested, fed and well ahead of schedule.`,'gold-30 xp+l hp+m mp+s','gold:30'),
+  c('Haggle her down to twenty.','CHA 11 persuade',`She laughs, shakes your hand and agrees. A good guide is worth twenty, and a good haggler is worth watching.`,'gold-20 xp+l hp+m','"Thirty, or nothing," she says, and goes back to whittling.','xp+s','gold:20'),
+  o('Thank her and go alone.',`Your route is slower, but you learn the land the hard way.`,'xp+s')]],
+['any','Roadside Shrine','🕯️',`A small, mossy shrine stands at a crossroads, with a bowl for offerings and a faded carving of a smiling woman holding a lantern. A traveller kneels before it, whispering. A sign reads: "Light given is light returned."`,[
+  o('Leave 20 gold in the bowl.',`The coins clink. A warm breath of air stirs the candle flame, and for the next day, nothing seems quite as dark.`,'gold-20 xp+m mp+m st:bless3','gold:20'),
+  o('Leave a few coppers and a flower.',`A small gift, honestly given. You walk on a little lighter.`,'gold-5 xp+s mp+s','gold:5'),
+  o('Kneel and pray without giving anything.',`You still your mind. The shrine does not mind.`,'xp+s mp+s')]],
+['any','Gate Guard for Hire','🛂',`At the walls of a small border town, a bored guard holds up a hand. "No entry after sundown. Strangers must wait for the captain, who is, ah, indisposed until morning." He rubs two fingers together, very slightly.`,[
+  o('Slip him 25 gold.',`The gate creaks open. "Welcome to the town," he says warmly, to nobody in particular. Inside, a hot bath and a bed are waiting.`,'gold-25 xp+m hp+m mp+s','gold:25'),
+  c('Talk him into letting you in for free.','CHA 12 persuade',`You tell him a long, dull, entirely true story about the Silver Lantern, and he waves you through to make you stop.`,'xp+l hp+s','"Morning," he says firmly. You spend a cold night outside the walls.','xp+s hp-s'),
+  o('Camp outside the walls.',`A cold night, but a quiet one. At dawn, the captain waves you in.`,'xp+s')]],
+['any','The Apothecary\'s Cart','⚗️',`A painted cart rattles up beside you, hung with bottles and bundles of herbs. "Healing draughts! Mana tonics! Bandages! All fresh, all potent. Gold buys life, friend."`,[
+  o('Buy a healing draught (25 gold).',`A small green bottle, warm in the hand. It will pull you back from the edge when you most need it.`,'gold-25 +healing_draught xp+s','gold:25'),
+  o('Buy a mana tonic (30 gold).',`A shimmering blue vial. It tastes of cold mint and thunderstorms.`,'gold-30 +mana_tonic xp+s','gold:30'),
+  o('Buy a roll of bandages (12 gold).',`Clean linen, tightly rolled. A humble item that saves many lives.`,'gold-12 +bandages xp+s','gold:12'),
+  o('Browse, chat and move on.',`The apothecary shows you three useful herbs and a very unpleasant mushroom. You leave knowing a little more.`,'xp+s')]],
+['any','The Camp Cook','🍲',`A round, rosy cook is ladling stew from an iron pot over a roadside fire, with a ring of tired travellers around it. The smell is irresistible. "Ten gold a bowl, and the bowl is yours to keep," she says.`,[
+  o('Pay 10 gold for a bowl.',`Thick, hot, peppery stew with dumplings. You have not eaten so well in a week, and you feel like a different person.`,'gold-10 hp+l mp+m xp+s','gold:10'),
+  c('Offer to wash dishes in exchange.','CON 9 endure',`An hour of scrubbing later, you are given a bowl, a hunk of bread and a grateful pat on the shoulder.`,'xp+m hp+m mp+s','The pots win. She gives you the bread anyway, with a long-suffering sigh.','xp+s hp+s'),
+  o('Share a story at the fire for a bowl.',`Your story makes the travellers laugh, and the cook decides it is worth a bowl.`,'xp+m hp+m mp+s')]],
+['any','The Dice Game','🎲',`Three men squat by the road with a cloth and a pair of bone dice. "Ten gold, little friend. Double your coin, or lose it. Fair is fair." Their smiles are a bit too friendly, and the dice look a bit too tidy.`,[
+  c('Play one round (10 gold) and watch the dice closely.','WIS 11 survive',`You spot the weighted die, wait, and call a bluff. The men sigh, pay you double, and move off to find an easier mark.`,'gold+20 xp+l','The dice land wrong, and ten gold is gone. A cheap lesson.','gold-10 xp+s','gold:10'),
+  o('Refuse politely and keep walking.',`"Wise child," one of them calls after you, a touch sourly.`,'xp+s'),
+  c('Point out the weighted die.','CHA 11 persuade',`The men stare, shrug and hold up their hands. "Fair enough, fair enough." You leave with your coin, and your reputation.`,'xp+m','They laugh it off, but one of them follows you for a bit.','xp+s hp-s')]],
+['any','A Beggar\'s Bowl','🥣',`A thin, hollow-cheeked man sits by the road with a wooden bowl. He does not look up as you pass. He does not say a word. He just holds out his bowl, in hands that shake.`,[
+  o('Drop in a handful of gold (15).',`He looks up, finally, with eyes that are too bright. "I was a soldier once," he whispers. "I know a road that goes under the Gloamfen. Take it." He draws you a map in the dust.`,'gold-15 xp+l mp+m','gold:15'),
+  o('Share a bit of your food.',`He eats slowly, wiping every crumb. "Thank you," he says. That is all. It is enough.`,'xp+m mp+m -ration','item:ration'),
+  o('Nod and walk on.',`He does not look up. You carry the picture with you for miles.`,'xp+s')]]
+]);
+/* add the new pool to every road region (the school-years regions stay quiet) */
+['greenmarch','stonehelm','gloamfen','amber','saltwind','frostmere','hollowdeep','ashen'].forEach(r => { if (G.regions[r]) G.regions[r].enc.toll = 1.5; });
+
+/* trim filler encounters in the school years, so the road starts sooner */
+['act2','act3'].forEach(id => { const ch = G.chapters[id]; if (!ch) return; const old = ch.beats; ch.beats = S => { let k = 0; return (typeof old === 'function' ? old(S) : old.slice()).filter(b => b !== '~enc' || (k++ % 2 === 0)); }; });
 })();
 
 </script>
@@ -7394,6 +7445,14 @@ function epi(S){
   if (fl('gr_eris_pardoned')) L.push('Eris is said to have a seat at every feast now, and has been, according to most accounts, almost well-behaved.');
   else if (fl('gr_eris_banished')) L.push('Eris, banished, still sends the occasional golden apple. Everyone has learned to leave it alone.');
   if (fl('gr_poseidon_boon')) L.push('A pearl, now and then, turns up at the edge of the sea, with your name on it.');
+  if (fl('gr_niko_restored')) L.push('Niko woke from his stone nap with a grin, and has been bragging about it ever since.');
+  else if (fl('gr_niko_stone')) L.push('Niko still stands on Gorgon Island, a grinning stone boy with his crook raised, waiting for someone to ask the right goddess.');
+  else if (fl('gr_niko_waits')) L.push('Niko waited at the boat, and has told everyone he ever met that he nearly saw a Gorgon.');
+  if (fl('gr_mara_ashore')) L.push('Mara met you at the shore, drenched and fuming, and has never let you forget the wave.');
+  else if (fl('gr_mara_lost') && !al('gr_mara')) L.push('Mara was lost to the sea, and some sailors say they hear her laughing in the swell.');
+  if (fl('gr_elena_forgot')) L.push('Elena stayed by the quiet river, smiling. Some travellers say she is still there, telling the shades about Homer.');
+  if (fl('gr_hourglass_lost')) L.push('The Hourglass of Chronos was never found, and time has had a slight tremor ever since.');
+  if (fl('gr_zeus_annoyed')) L.push('Zeus was never quite warm to you afterwards.');
   const names = ['gr_elena','gr_mara','gr_niko','gr_glaux'].filter(al).map(a=>G.allies[a].n.split(' ')[0]);
   if (names.length) L.push(names.join(', ') + ' will be part of your story as long as you tell it.');
   L.push('You made ' + S.choices + ' choices on this journey and reached level ' + S.lvl + '.');
@@ -7415,6 +7474,209 @@ END('gr_end_apple','village|🍏 🗿','Ending: The Fairest',
 
 </script>
 <script>
+/* THE THREAD OF THE MOIRAI — adventure pack: action encounters, a market that matters, Favor and drachmae with real jobs, a faster start. */
+(function(){
+const G = globalThis.G;
+const o = (t, y, fx, req) => [t,'',y,fx||'xp+s','','',req||''];
+const c = (t, chk, y, fx, n, nfx, req) => [t,chk,y,fx||'xp+m',n||'It does not quite work out.',nfx||'xp+s',req||''];
+const dare = (t, mp, y, fx, req) => [t,'',y,fx||'xp+l','','',req||'',mp];
+const L = (reg, title, em, text, ...opts) => [reg, title, em, text, opts];
+
+/* ================= ACTION ================= */
+G.miniArch('gr_action', [
+L('any','Harpies!','🦅',`A shriek from the sky. Three bird-bodied women with wild hair swoop down on you, talons out, and snatch at your bag. The Harpies are famous for stealing food from the hungry.`,
+ c('Drop and cover your bag.','DEX 9 dodge',`You curl round the bag, and the Harpies screech, flap and thieve a single fig before giving up and flapping off, insulted.`,'xp+m mp+2','They snatch a handful of coins and your best snack before flapping off, cackling.','xp+s gold-5'),
+ dare('Wave the olive branch or shout a challenge. (Costs Favor)',3,`"In the name of Athena!" you cry. The Harpies stop in mid-air and flap away in a sulk. You keep every crumb.`,'xp+l mp+1'),
+ o('Throw a honey cake to distract them.',`They fight over it in a cloud of feathers while you slip away.`,'xp+m -gr_honey','item:gr_honey'),
+ o('Duck into a nearby cave until they pass.',`A long, nervous wait. They leave, still screeching.`,'xp+s')),
+L('any','Bandits on the Road','🗡️',`Four men in ragged cloaks step out of the olive grove and block the road. "A toll for the road," says the biggest, hefting a club. "Ten drachmae, friend. Or something equally valuable."`,
+ o('Pay the 10 drachmae.',`The bandit counts the coins, nods and waves you on. "Pleasure," he says. A plain solution to a plain problem.`,'gold-10 xp+s','gold:10'),
+ c('Talk your way past them.','CHA 9 persuade',`You explain you are a priestess\'s messenger, bound for Delphi. They back off, muttering. "Well, why didn\'t you say?"`,'xp+l mp+2','They are not convinced, and you lose a few coins before they let you go.','xp+s gold-4'),
+ dare('Walk straight through the middle of them. (Costs Favor)',3,`You do not slow down. You do not blink. They part like a curtain. "Lunatic," one of them mutters, almost admiringly.`,'xp+l mp+1'),
+ o('Go round through the olive grove.',`Twenty minutes of scrambling through branches. You emerge scratched but untroubled.`,'xp+s hp-1')),
+L('any','The Charging Bull','🐂',`A great black bull, escaped from a sacrifice, thunders down the village street. People scatter. A small boy is frozen in its path, clutching a ball.`,
+ c('Dive and pull the boy aside.','DEX 9 dodge',`You scoop him up and roll. The bull thunders past with a gust of hot air. The boy hugs you. His mother weeps.`,'xp+l mp+3 flag:gr_kind','You are too slow, and a hoof catches your leg, but the boy is safe.','xp+m hp-3 flag:gr_kind'),
+ dare('Stand in front of the bull and hold up your hands. (Costs Favor)',3,`The bull skids, snorts, and stops a handspan from your nose. You stare it down until it shakes its head and trots away, quiet as a lamb.`,'xp+l mp+2 flag:gr_kind'),
+ o('Shout for help and herd the villagers into a doorway.',`A dozen people squeeze into a baker\'s shop as the bull rushes past. Nobody is hurt.`,'xp+m mp+2 flag:gr_kind')),
+L('any','A Satyr\'s Game','🐐',`A satyr with a goatee and a wineskin pops up from behind a rock. "A wager, a wager!" he cries. "Out-dance me and I will give you a gift. Lose, and you carry my wine to the next village!"`,
+ c('Dance, as hard as you can.','DEX 8 perform',`You whirl, leap and stamp. The satyr whoops, claps and finally collapses in laughter. "A gift for the best dancer in a hundred years!" He presses a bag of coins into your hand.`,'xp+l gold+8 mp+3','He out-dances you easily, and you carry his wine for a mile.','xp+s hp-1'),
+ o('Decline politely.',`"Spoilsport!" he cries, but he pours you a drink anyway.`,'xp+s mp+2'),
+ o('Offer to play his pipes instead.',`The sound is terrible. The satyr is enchanted. You part friends.`,'xp+m mp+2 flag:gr_kind')),
+L('any','Narrow Ledge','⛰️',`The path along the cliff narrows to a ledge barely a foot wide. Below, the sea crashes on rocks. A goat looks at you from the other side with open contempt.`,
+ c('Edge along facing the rock.','DEX 9 climb',`Inch by inch, you shuffle across. At the end, the goat gives a bleat that might be applause.`,'xp+m mp+2','A stone crumbles and you slide, scraping both palms, before you catch the ledge.','xp+s hp-3'),
+ o('Go back and find the long way round.',`Two hours extra, but not a scratch.`,'xp+s'),
+ dare('Run across in one go. (Costs Favor)',2,`Your feet barely touch the rock. Halfway, your heart is in your mouth. At the end, you stand on firm ground, trembling and thrilled.`,'xp+l mp+1')),
+L('any','Shipwreck Swim','🌊',`A rogue wave smashes into the little fishing boat. Planks fly. The crew yells. You find yourself in the sea, with the boat sinking behind you and a small, scared sailor boy clutching a barrel.`,
+ c('Swim to the barrel and tow him to shore.','STR 9 endure',`A hard, cold, burning swim. You drag him onto the beach, and he coughs, sobs and hugs you. The whole village comes running.`,'xp+l hp-2 mp+3 flag:gr_kind','The current is stronger than you expected. You make it, barely, bruised and shivering, with the boy.','xp+m hp-4 flag:gr_kind'),
+ o('Float on your back and wait for rescue.',`Twenty minutes later, a boat finds you. Cold, wet and alive.`,'xp+s hp-2'),
+ dare('Call on Poseidon for mercy. (Costs Favor)',3,`The sea heaves, and a large, smooth swell rolls you and the boy up the beach as gently as a hand. Poseidon, it seems, was listening.`,'xp+l hp+2 flag:gr_respect')),
+L('any','The Nymph\'s Riddle','🧚',`A water nymph peeps from a spring, grinning. "A riddle for a drink of the sweetest water in Greece! What is always coming, but never arrives?"`,
+ o('"Tomorrow."',`She claps in delight and fills a flask. The water is cold, clear and sweet, and you feel refreshed in body and mind.`,'xp+m hp+6 mp+4'),
+ o('"A ship."',`"Ha! Close, but ships do arrive." She dips her fingers and flicks a few drops at you, laughing.`,'xp+s mp+1'),
+ o('Pay 2 drachmae for a flask instead.',`She rolls her eyes and fills it for the price. The water is just as good.`,'gold-2 hp+4 mp+2','gold:2')),
+L('any','Centaur Race','🏇',`A centaur at a crossroads stamps and snorts. "You walk like a slug," he says. "Race me to that tree, and if you win, I will carry you to Delphi."`,
+ c('Race him flat out.','DEX 10 dodge',`Neck and neck, to the very last stride. You lunge at the tree and touch it a fingernail before his hoof. "By Zeus!" he gasps, and honours the wager.`,'xp+l mp+3 hp-1','He wins by three lengths, laughing. "Next time, slug!"','xp+s'),
+ o('Decline. You are not in a hurry.',`"Wise slug," he says, with a snort of laughter.`,'xp+s'),
+ o('Challenge him to a riddle instead.',`He stops, offended, then thoughtful. By the end he is laughing again, and gives you a ride for a mile.`,'xp+m mp+2')),
+L('any','Wild Dogs of the Hills','🐺',`Three shaggy, yellow-eyed sheepdogs, half-wild and half-starved, circle you in the pass. They are not growling. They are hungry. Their ribs show.`,
+ o('Share your food with them.',`They wolf it down, wag and follow you for half a mile before drifting back to the hills.`,'xp+m mp+3 flag:gr_kind -gr_bread','item:gr_bread'),
+ c('Stand tall and talk calmly.','WIS 8 survive',`You hold your ground and speak quietly. After a long minute, the dogs lose interest and trot away.`,'xp+m mp+2','They bark, snap and nip at your cloak before drifting off.','xp+s hp-2'),
+ o('Climb the nearest rock.',`They wait below, then drift off when you do not come down.`,'xp+s')),
+L('any','Eris\'s Prank','🍏',`You find a golden apple at the side of the road, shining, with a little label: "FOR YOU". Beside it, a hastily written note: "I am sorry about the plane. Eris." There is a very small smiley face.`,
+ o('Leave it, and walk on.',`Wise. Behind you, from nowhere, comes a theatrical sigh.`,'xp+m mp+2'),
+ c('Examine the apple closely.','INT 9 lore',`Under the paint, the apple is a plain wooden toy, with a tiny scroll rolled inside: "Better luck next time." You laugh, despite yourself.`,'xp+l mp+2','It is only an apple. Possibly cursed. You leave it.','xp+s'),
+ dare('Take it and keep it as evidence. (Costs Favor)',2,`You wrap it in cloth. It hums unpleasantly in your bag, but it might be very useful in a trial.`,'xp+m +gr_apple'))
+]);
+
+/* ================= MARKET ================= */
+const buy = (t, cost, item, msg, extra) => o(`${t} (${cost} drachmae).`, msg, `gold-${cost} +${item} ${extra||'xp+s'}`, `gold:${cost}`);
+G.miniArch('gr_shop', [
+L('any','An Agora Stall','🛍️',`A stallholder with a booming voice shouts above the din: "Honey cakes! Figs! Barley bread! Watered wine! The best prices in all Athens!"`,
+ buy('Buy a honey cake',3,'gr_honey','Warm, sticky and rich. It is also, you suspect, the perfect gift for something hungry and many-headed.'),
+ buy('Buy a bag of figs',2,'gr_figs','Plump, purple and sweet.'),
+ buy('Buy a skin of watered wine',3,'gr_wine','The Greek way: wine and water. A fine offering to a thirsty god.'),
+ o('Just browse.',`A large cheese catches your eye, and a large fly catches the cheese.`,'xp+s')),
+L('any','A Temple Offering Table','🛕',`At the temple door, a priestess sits at a little table of offerings: honey, incense, flowers and little votive figurines. "A gift to the god," she says, "is a gift to yourself."`,
+ o('Offer 5 drachmae and a prayer.',`The priestess touches your forehead. A warm, golden feeling floods through you, and you feel a god\'s attention on you, light as a feather.`,'gold-5 xp+m mp+m st:bless3 flag:gr_respect','gold:5'),
+ o('Offer a honey cake.',`She places it on the altar. The flame leans toward it, politely.`,'-gr_honey xp+l mp+m flag:gr_respect','item:gr_honey'),
+ o('Say a prayer, and leave nothing.',`She nods. A sincere prayer is accepted, in a smaller way.`,'xp+s mp+2')),
+L('any','The Boatman\'s Offer','⛵',`A fisherman with a patched sail and a gap-toothed smile leans on his boat. "Two drachmae and I take you down the coast. Or walk, and see the bandits."`,
+ o('Pay the 2 drachmae.',`A bright, windy hour on the water, and you step off rested, with the day half done.`,'gold-2 xp+m hp+3 mp+2','gold:2'),
+ c('Barter your way aboard.','CHA 8 persuade',`You offer a story about a flying chariot, and he laughs so hard that you ride free.`,'xp+m mp+2','He shrugs and pushes off without you.','xp+s'),
+ o('Walk the coast road.',`Dusty, hot, with a little sea breeze. Nothing happens, which is rather nice.`,'xp+s')),
+L('any','The Wandering Healer','🌿',`An old woman with a basket of herbs hums by the road, grinding something green in a bowl. "Cuts, burns, bruises and heartache," she says. "A fair price for each."`,
+ o('Buy a salve (4 drachmae).',`She rubs a cool, sharp-smelling paste on your scrapes. In minutes, the stinging is gone.`,'gold-4 hp+10 xp+s','gold:4'),
+ buy('Buy a roll of bandages',3,'gr_bandages','Clean linen, wrapped tight.'),
+ o('Chat and learn which herbs are safe.',`She teaches you three plants, and you tuck the knowledge away.`,'xp+m mp+2')),
+L('any','A Bribe at the Gate','🛂',`A bored guard at a small city gate leans on his spear. "Gates are closed. Special pass needed. Or, ah, a small donation to the guard\'s wine fund."`,
+ o('Slip him 5 drachmae.',`The gate swings open. "A pleasure," he says. "Mind the cats."`,'gold-5 xp+s','gold:5'),
+ c('Argue your case calmly.','CHA 9 persuade',`You explain, charm and flatter. He is so flattered that he opens the gate and waves you through.`,'xp+m mp+2','He will not budge. You wait for dawn.','xp+s'),
+ o('Wait for morning at an inn.',`A cheap bed and a long sleep. The gate opens at dawn.`,'xp+s rest'))
+]);
+
+/* ---------- weights ---------- */
+const W = (r, a, s, l, t, k, p) => { const R = G.regions[r]; if (R) R.enc = { gr_action:a, gr_shop:s, gr_local:l, gr_trivia:t, gr_kind:k, gr_peril:p }; };
+W('gr_rome', 2, 1, 4, 2, 1, 0);
+W('gr_shore', 5, 2, 3, 3, 2, 2);
+W('gr_athens', 4, 3, 4, 4, 2, 0);
+W('gr_delphi', 4, 2, 4, 4, 2, 1);
+W('gr_sea', 5, 2, 4, 3, 1, 3);
+W('gr_gorgon', 4, 0, 3, 3, 1, 3);
+W('gr_forge', 4, 0, 3, 3, 1, 2);
+W('gr_hades', 4, 0, 3, 4, 1, 3);
+W('gr_olympus', 5, 0, 3, 4, 1, 1);
+
+/* ---------- Favor and drachmae in key scenes (options that spend them, so they matter) ---------- */
+const add = (id, opt, atIndex) => { const sc = G.scenes[id]; if (!sc) throw new Error('gr_polish: missing '+id); if (atIndex == null) sc.opts.push(opt); else sc.opts.splice(atIndex, 0, opt); };
+add('gr4_pythia', { t:`Ask for a clearer answer. (Costs Favor)`, mp:3, y:[`The Pythia's head turns toward you, slowly. "Ask boldly, and I answer boldly," she says. "The hourglass is in the realm of the grey lord. The thread is in the loom of the sisters. The sandals are one in the sea and one in a gaze of stone. And the time to return to is the time you last felt sure."`,'xp+l flag:gr_oracle flag:gr_knows_time'] });
+add('gr5_storm', { t:`Pray aloud to Poseidon for calm. (Costs Favor)`, mp:3, y:[`"Earth-Shaker, hear us!" The wind stills like a held breath. The waves ease. "Hm," says the sea, thoughtfully. "A mortal who asks nicely. Come down and tell me why."`,'xp+l flag:gr_respect'] });
+add('gr6_cave', { t:`Whisper a prayer to Athena for courage. (Costs Favor)`, mp:3, y:[`A warmth spreads over your shoulders like a cloak. Your fear drains away. You step in with your eyes tightly shut, perfectly steady, and a small, calm voice (not yours) says: "Left. Left a little. There."`,'xp+l flag:gr_respect'] });
+add('gr7_ferry', { t:`Offer Charon something unspoken: a vow, and a little Favor. (Costs Favor)`, mp:4, y:[`He looks at you for a very long time. "Strange coin," he says. "But I have heard worse." He gestures to the boat.`,'xp+l flag:gr_charon'] });
+add('gr7_hound', { t:`Sing Orpheus's lullaby to the hound. (Costs Favor)`, mp:3, y:[`The words come from somewhere deeper than memory. The first head droops, the second yawns, the third snores. You tiptoe past.`,'xp+l flag:gr_cerberus'] });
+add('gr9_zeus', { t:`Ask Athena to speak for you. (Costs Favor)`, mp:4, y:[`"This mortal has done what many gods would not," says a clear voice at your shoulder. Athena has risen. Zeus looks at her for a long moment. "Speak, then."`,'xp+l flag:gr_zeus_heard flag:gr_respect'] });
+add('gr5_port', { t:`Pay Captain Nikias extra to sail through the night (10 drachmae).`, r:'gold:10', y:[`He grins, spits on his palms and bellows for the crew. By dawn you are halfway there, and the crew are in a very good mood.`,'gold-10 xp+l mp+2 flag:gr_ship'] });
+add('gr4_arrive', { t:`Make a generous offering at the temple door (8 drachmae).`, r:'gold:8', y:[`The priestess lifts the bowl to the light. "Apollo notices," she says. A warm, golden hum rolls through you.`,'gold-8 xp+m mp+m st:bless3 flag:gr_respect'] });
+
+/* ---------- pacing: a faster start ---------- */
+G.chapters.gr1.beats = () => ['@+gr_ticket +gr_phone +gr_watch'].concat(G.mix(['gr1_wake','gr1_colosseum','gr1_pantheon','gr1_airport','gr1_flight','gr1_quiz','gr1_light','gr1_crash'],3,{nocamp:true}));
+['gr3','gr4'].forEach(id => { const ch = G.chapters[id]; if (!ch) return; const old = ch.beats; ch.beats = S => { let k = 0; return (typeof old === 'function' ? old(S) : old.slice()).filter(b => b !== '~enc' || (k++ % 2 === 0)); }; });
+})();
+
+</script>
+<script>
+/* THE THREAD OF THE MOIRAI — higher stakes: companions can be lost, Eris's last trick needs Favor, friends or Athena's gifts,
+   and the final trip through time draws on your Favor. */
+(function(){
+const G = globalThis.G, { S_ } = G.grh;
+const place = (chId, targetId, beat, where) => { const ch = G.chapters[chId]; const old = ch.beats; ch.beats = S => { const b = typeof old === 'function' ? old(S) : old.slice(); const i = b.indexOf(targetId); if (i < 0) b.push(beat); else b.splice(where === 'after' ? i + 1 : i, 0, beat); return b; }; };
+
+/* ---------- Mara overboard (Poseidon's storm) ---------- */
+S_('gr5_mara','Overboard!','sea|🌊 🆘',
+`A monster wave slams the deck. Everybody grabs a rail. When the water clears, Mara is not there. A flash of her orange scarf, thirty feet out in the grey swell, and a hand, waving.\n"MARA!" you scream. The sailors are frozen. The ship is lurching. There is perhaps one minute.`,[
+ {t:`Throw her a rope and haul.`,c:'STR 8 endure',y:[`The rope uncoils like a snake and she grabs it with both hands. You haul, the sailors haul, and she comes up the side, coughing and swearing in three languages. She gives you a ferocious hug.`,'xp+l mp+3 hp-1 bond:gr_mara'],n:[`The rope falls short. Mara disappears under a wave, and the sea closes over the place where she was. Nikias grabs your shoulder. "She is in Poseidon's hands now," he says. "May he be kind."`,'xp+s mp-3 hp-2 drop:gr_mara flag:gr_mara_lost']},
+ {t:`Dive in after her. (Costs Favor)`,mp:3,y:[`You hit the water like a stone and the sea shoves you toward her as if it were carrying you. Your hand closes on her scarf. A sailor gets a rope round you both, and you are hauled up, spluttering. "Never do that again," says Mara, hugging you.`,'xp+l mp+1 hp-2 bond:gr_mara flag:gr_respect']},
+ {t:`Pour out your watered wine to the sea and pray.`,r:'item:gr_wine',y:[`The wine spreads out in a red ribbon, and the sea hesitates. A great wave rolls under Mara and lifts her, gently, onto the ladder. "Hm," says Poseidon\'s voice, very far away. "Fine."`,'-gr_wine xp+l mp+3 bond:gr_mara flag:gr_respect']},
+ {t:`Shout for the sailors to fish her out.`,y:[`The sailors scramble, and a fishing boat hauls her out a few minutes later, half-drowned and furious. "I'll meet you at the shore," she gasps as the boat carries her away. "Do not do anything clever without me."`,'xp+s drop:gr_mara flag:gr_mara_ashore']} ]);
+S_('gr5_mara_back','Poseidon Returns Mara','sea|⛵ 🌊',
+`As you leave the hall, a wave lifts a figure onto the deck, drenched, annoyed and carrying a very large crab. It is Mara. "I was escorted," she says with enormous dignity, "by something very tall and very polite. He insisted on carrying my scarf." She wrings out her sleeve. "I have a lot to say about your ship."\nPoseidon, it seems, remembers who showed respect.`,[
+ {t:`Hug her, hard.`,y:[`She hugs back, which is rare. "Right," she says. "What is next? Because I intend to be useful."`,'xp+l mp+3 ally:gr_mara bond:gr_mara']},
+ {t:`Hand her a dry cloak and a mug of something hot.`,y:[`She wraps it round herself, with the crab on her lap. "Thank you," she says, gruffly. "I'd have done the same for you."`,'xp+l hp+3 mp+2 ally:gr_mara']} ]);
+
+/* ---------- Niko runs ahead (Gorgon Island) ---------- */
+S_('gr6_niko','Niko Runs Ahead','gorgon|🏃 🗿',
+`"Is that her?" Niko yelps. A tall, still figure stands at the mouth of the cave, a long way up the shore. "The lady with the snakes! I just want to see!" And before you can catch his sleeve, he is off, racing between the statues, crook flapping, with an enormous grin on his face.\nHe is twenty paces from the cave. He is not looking at his feet. He is looking straight ahead.`,[
+ {t:`Tackle him before he gets any closer.`,c:'DEX 9 dodge',y:[`You hit him at a dead run, and the two of you go sprawling in the sand. He lands on his back, laughing. "You scared me!" he gasps. "I was only looking!" You hold on to his crook until he promises to stay behind you.`,'xp+l mp+2 bond:gr_niko'],n:[`You are a heartbeat too late. Niko skids to a halt in the cave mouth and looks up. For one second his face is amazed. Then he is a perfect grey statue, mid-stride, grinning, with his crook still raised. Elena makes a small, broken noise. Glaux closes his eyes.`,'xp+s mp-3 drop:gr_niko flag:gr_niko_stone']},
+ {t:`Hold up the polished shield between him and the cave.`,r:'item:gr_mirror',y:[`The bronze flashes across his path, and the cave mouth appears in it, safe and reflected. Niko stops dead, blinking. "Ohh," he says. "That is clever." You steer him round behind you.`,'xp+l mp+3 bond:gr_niko']},
+ {t:`Shout at him to stop. (Costs Favor)`,mp:3,y:[`Your voice carries across the shore like thunder. Niko stops mid-stride, as if you had thrown a net. "Alright, alright!" he calls, turning. His eyes are tightly shut. He had known the rule all along. He just forgot it for a moment.`,'xp+l mp+1 bond:gr_niko']},
+ {t:`Order him back to the boat, and make him go.`,y:[`He argues. You argue back, firmly. In the end he trudges back to the boat, scuffing his sandals. "You're no fun," he mutters. "Tell me everything after."`,'xp+s drop:gr_niko flag:gr_niko_waits']} ]);
+
+/* ---------- Elena and the river (Underworld) ---------- */
+S_('gr7_elena','Elena at the Water','underworld|🌾 💧',
+`Behind you, the crunch of Elena\'s footsteps stops. You turn. She is standing at the very edge of the clear, quiet river, with her head tilted, smiling gently. "Forty years of teaching," she murmurs. "A lot of names. A lot of faces. So many lectures. It would be so restful to put them down."\nShe kneels, and cups her hand.`,[
+ {t:`Grab her arm and pull her back.`,c:'STR 8 endure',y:[`You hook her elbow and heave. She sits down on the path, blinking. "Oh," she says. "Oh, dear. How silly of me." She laughs, shakily. "It was very persuasive water."`,'xp+l mp+3 bond:gr_elena'],n:[`You are a second too slow. A single sip passes her lips. Her face goes soft and smooth, and the light in her eyes dims. "Hello," she says politely. "Have we met?" She wanders off along the river, humming, and does not look back.`,'xp+s mp-3 drop:gr_elena flag:gr_elena_forgot']},
+ {t:`Remind her of her students and her classroom.`,c:'CHA 8 persuade',y:[`"Mrs Rossi," you say. "Room 14. The girl with the red scarf who always asked questions." Her head turns. "Giulia," she whispers. "Giulia Bianchi. She wanted to be an archaeologist." She stands, brushes off her skirt and takes your arm. "Well," she says. "We had better get on."`,'xp+l mp+3 bond:gr_elena flag:gr_kind'],n:[`She hears you, but the words slide off her like rain off a leaf. "How kind," she says. "But I am so tired." She takes a very small sip.`,'xp+s drop:gr_elena flag:gr_elena_forgot mp-2']},
+ {t:`Hold the laurel of Apollo up to her.`,r:'item:gr_laurel',y:[`The laurel glows faintly. "Apollo, who remembers everything," murmurs Elena, touching it. The dreamy look clears from her face. "Thank you," she says, standing. "I must have been tired."`,'xp+l mp+3 bond:gr_elena']},
+ {t:`Let her make her own choice.`,y:[`She turns her head, looks at you for a long time, and smiles. "Dear one," she says. "I think I should stay here and rest. Finish what you started." She presses her notebook into your hand. "I will be waiting, in the end."`,'xp+s mp-1 drop:gr_elena flag:gr_elena_forgot']} ]);
+
+/* ---------- Eris's last trick: the hall erupts ---------- */
+S_('gr9_discord','Eris Throws Discord','olympus|🍏 💥',
+`Eris, seeing the trial slip from her fingers, raises one slim, golden hand. "Shall we give them something to argue about?" she says, and flicks her wrist.\nA ripple of gold crosses the hall. Ares and Poseidon are on their feet, roaring about who sank whose ship. Hera and Aphrodite are screaming about the apple. Apollo is shouting at Hermes. A thunderbolt crackles in Zeus\'s fist. In the confusion, Eris is slipping toward the door, with a strange glint in her eye and a very quiet smile.\nSomeone must calm this hall, now.`,[
+ {t:`Raise your voice above the din. (Costs Favor)`,mp:6,y:[`You climb onto a bench and say "STOP", and everything in your Favor goes into it. Your voice is not loud. But it is true, and the whole hall, for a moment, hears it. The quarrel dies. The gods look at each other, abashed.`,'xp+l flag:gr_calmed']},
+ {t:`Hold up the olive branch of Athena.`,r:'item:gr_olive',y:[`The silver leaves shimmer, and a silence unfolds from them like a flower. Athena rises from her throne, takes the branch in her hand and says: "Enough." The hall obeys.`,'xp+l mp+3 flag:gr_calmed']},
+ {t:`Ask Elena to speak, since she knows every name.`,r:'ally:gr_elena',y:[`Elena steps forward, in her crumpled scholar\'s clothes, and clears her throat. "Lord Ares," she says in perfect classical Greek. "Lord Poseidon. Lady Hera. I have studied you for forty years, and I should like to say that I admire you all. Now: sit down." Forty years of teaching bring a silence that no thunderbolt could.`,'xp+l mp+3 bond:gr_elena flag:gr_calmed']},
+ {t:`Ask Glaux to hoot for silence.`,r:'ally:gr_glaux',y:[`Glaux takes a deep breath and lets out a hoot like a trumpet. It is the loudest, rudest, most magnificent sound that has ever been heard on Olympus. The gods stop, stare and turn their heads in unison. "Hm," says Athena, with dry approval. "Mine."`,'xp+l mp+3 bond:gr_glaux flag:gr_calmed']},
+ {t:`Shout "ENOUGH!" and hope someone listens.`,y:[`Your voice is lost in the roar. A rogue thunderbolt singes your sleeve. By the time the gods look round, Eris is at the door, hourglass in her hand and her silks swirling, laughing like a bell.`,'xp+s hp-3 flag:gr_discord_failed']} ]);
+S_('gr9_chase','The Chase Through the Clouds','olympus|🏃 ☁️',
+`Eris sprints across the clouds, silks streaming behind her, the cracked Hourglass tucked under one arm. "Catch me if you can!" she cries. The gods are still bickering. Nobody is following.\nIf she gets away with the Hourglass, time cannot be mended properly. You have seconds.`,[
+ {t:`Chase her across the clouds.`,c:'DEX 10 dodge',y:[`You pelt along the cloud-tops, leap a gap and tackle her round the ankles. The Hourglass rolls free and you catch it. She laughs, delighted, flat on her back. "Oh, you ARE fun," she says.`,'xp+l mp+2 hp-1'],n:[`Cloud is slippery stuff. You fall through twice, and she vanishes round a pillar, laughing. When you stagger back to the hall, with bruises and no Hourglass, a messenger finds you: "She dropped it at the gates of Hades. It will be a long time before it is found."`,'xp+s hp-3 -gr_hourglass flag:gr_hourglass_lost']},
+ {t:`Ask Hermes to fly after her.`,r:'flag:gr_hermes_back',y:[`Hermes is already moving, in a flash of silver. He catches Eris mid-stride, plucks the Hourglass from under her arm and returns in a heartbeat. "Fast enough?" he says, grinning. He hands it to you.`,'xp+l mp+3']},
+ {t:`Appeal to Zeus to command her back.`,y:[`Zeus rises. A word, and Eris stops as if on a leash. The Hourglass is brought back. But the king of the gods is not pleased to have had to be asked, and he looks at you with open irritation for the rest of the day.`,'xp+m mp-2 flag:gr_zeus_annoyed']},
+ {t:`Let her go, and make do without the Hourglass.`,y:[`It is a bitter choice. You watch her disappear into the clouds. Without the Hourglass, the sands of time cannot be fully steadied. The mending will be rougher, and more of a gamble.`,'xp+s -gr_hourglass flag:gr_hourglass_lost']} ]);
+
+/* ---------- Niko can be restored if Athena has forgiven ---------- */
+S_('gr9_niko','Athena Wakes Niko','olympus|🗿 🌿',
+`Athena looks at you for a long moment. "You have a stone boy on Gorgon Island," she says. "I have been told." She sets her spear aside, kneels, and touches the olive branch to the air. "I owed Medusa an apology. I think I may also owe him a childhood." Far away, on a shore of grey statues, one of them blinks.\nA moment later, a grinning boy in a ragged tunic steps out of a cloud, shaking his crook. "I had a very odd nap," says Niko.`,[
+ {t:`Hug him, very tightly.`,y:[`"Ow," he says, delighted. "Is it dinner time?" Elena is laughing and crying at once.`,'xp+l mp+4 ally:gr_niko bond:gr_niko flag:gr_niko_restored']},
+ {t:`Thank Athena with a deep bow.`,y:[`"Do not thank me," says Athena. "Thank Medusa. She asked."`,'xp+l mp+3 ally:gr_niko flag:gr_niko_restored flag:gr_respect']} ]);
+S_('gr9_niko_sad','A Stone Boy','olympus|🗿 😔',
+`"The boy on Gorgon Island," says Athena, quietly. "I could undo it, if the Gorgon\'s curse were mine to lift. It is not. It will take her forgiveness, and mine, for what I did to her."\nShe looks at her hands for a very long time. "I am very sorry. I will think about it."`,[
+ {t:`Bow your head.`,y:[`There is nothing to say. Niko stands on a grey shore, still grinning, and somewhere a tiny owl hoots in sorrow.`,'xp+s mp-2']},
+ {t:`Promise to come back for him someday.`,y:[`"Do," says Athena. "I will be waiting."`,'xp+m mp+2']} ]);
+
+/* ---------- wiring ---------- */
+place('gr5','gr5_storm','ally:gr_mara?gr5_mara','after');
+place('gr5','gr5_sandal','flag:gr_mara_lost&flag:gr_respect?gr5_mara_back','after');
+place('gr6','gr6_cave','ally:gr_niko?gr6_niko','before');
+place('gr7','gr7_fields','ally:gr_elena?gr7_elena','after');
+place('gr9','gr9_trial','gr9_discord','after');
+place('gr9','gr9_discord','flag:gr_discord_failed?gr9_chase','after');
+place('gr9','gr9_athena','flag:gr_niko_stone&flag:gr_athena_forgave?gr9_niko','after');
+place('gr9','gr9_athena','flag:gr_niko_stone&!flag:gr_athena_forgave?gr9_niko_sad','after');
+
+/* ---------- the trip through time costs Favor, and a lost Hourglass costs more ---------- */
+const mend = G.scenes.gr9_mend;
+const mendText = mend.text;
+mend.text = S => S.flags.gr_hourglass_lost ? mendText.replace('Zeus himself holds the cracked Hourglass, and the Fates, summoned, stand beside him.','Without the Hourglass, Zeus himself takes up what remains of time\'s thread, and the Fates, summoned, stand beside him.').replace('The silver sand stops falling upward. It trembles, turns, and drifts slowly down.','The sand is not there to hold it, so the mending is rough, a patchwork of stolen moments, shaky and thin.').replace('"Time is mended," says Atropos. "Almost."','"Time is mended," says Atropos. "More or less."') : mendText;
+const set = G.scenes.gr9_set;
+const T = (t, y, fx, req) => ({ t, mp:5, hide:!!req, r:req, y:[y, fx] });
+set.opts = [
+ T(`"16:40, in seat 23A, one minute before the golden light." (Costs Favor)`,`The sandals flare gold. The wings beat, once, twice, three times. The hall dissolves, the gods dissolve and the last thing you see is Athena's grey eyes, and Elena's smile.`,'xp+l >gr_end_home','!flag:gr_hourglass_lost'),
+ T(`"16:40, in seat 23A, one minute before the golden light." (Costs Favor)`,`The sandals flare, jerkily, and the wings stutter. The hall dissolves like a bad signal, and the last thing you see is Hermes's face, worried and kind. "It may not hold," he says.`,'xp+m >gr_end_rough','flag:gr_hourglass_lost'),
+ T(`"14:20: take-off from Rome." (Costs Favor)`,`The sandals flare. The wings beat. The world folds like paper.`,'xp+m >gr_end_early'),
+ T(`"16:47: the moment of the crash." (Costs Favor)`,`The sandals flare, doubtfully. The wings beat. The world folds like paper, and you arrive inside the roar, the light and the falling sky.`,'xp+s >gr_end_crash'),
+ { t:`"No. I am not going yet. I will stay."`, hide:true, r:'flag:gr_athena_forgave|flag:gr_eris_pardoned|flag:gr_medusa_freed', y:[`The sandals sigh, and settle. Hermes grins. "Well!" he says. "A mortal who stays. Who would have thought it." The hall bursts into applause.`,'xp+m >gr_end_olympian'] },
+ { t:`Rest on a cloud until your Favor returns.`, hide:true, r:'!mp:5', y:[`You lie back on a cushion of cloud, and Hermes, politely, looks the other way. By the time you sit up, your strength has come back.`,'rest xp+s stayc'] },
+ { t:`Step back, breathe and think it over.`, y:[`You take a slow breath, and another. Your thoughts settle, and the sandals hum, patiently.`,'xp+s mp+1 stayc'] } ];
+G.sc('gr_end_rough','cabin|🌊 ✈️',
+S => `You arrive in seat 23A at 16:40, with Elena beside you and the engines humming. But time is brittle. A minute later the golden light flickers through the cabin, the plane lurches and, instead of crashing, tips down into a long, shaking glide. Mara, wherever she is, would be proud of the pilot: the plane lands hard on the sea, a mile off a small Greek island, and every single passenger gets out.
+It is not the ending you wanted. A few people have broken bones, and the plane is a wreck. But everyone is alive, and fishing boats are already pulling them out of the water. Hermes, on a distant cloud, lets out a long breath.
+${G.grEpi(S)}`,[{t:'Return to the story menu', act:'new'}],{ end:true, title:'Ending: A Rough Landing' });
+/* the nested conditions above use hide on the first two times only when a requirement is present */
+set.opts.forEach(o => { if (!o.r) delete o.hide; });
+})();
+
+</script>
+<script>
 /* The Lady of Casuarina House — the order the chapters are played in (Chapter 1 to the House).
    Finishing a chapter flows into the next; the house chapter (cg4) is always last, and can also be reached early via goto:cg4. */
 (function(){
@@ -7423,6 +7685,417 @@ G.stories.changi.chapters = ['cg1','cg2','cgA','cgB','cgC','cgD','cgE','cg3','cg
 /* re-number the chapter titles so players see 1..14 in order */
 const names = { cg1:1, cg2:2, cgA:3, cgB:4, cgC:5, cgD:6, cgE:7, cg3:8, cgF:9, cgH:10, cgI:11, cgG:12, cgJ:13, cg4:14 };
 Object.keys(names).forEach(id=>{ const ch = G.chapters[id]; if (ch) ch.n = ch.n.replace(/^Chapter \d+:/, 'Chapter '+names[id]+':'); });
+})();
+
+</script>
+<script>
+/* THE LADY OF CASUARINA HOUSE — "adventure pack" rebalance:
+   the house is now explored in three visits that are interleaved with the investigation, quiet chapters are thinner,
+   random encounters are action-heavy, and money and Courage have real jobs. */
+(function(){
+const G = globalThis.G, I = G.item;
+const S_ = (id, title, art, text, opts, extra) => G.sc(id, art, text, opts, Object.assign({ title }, extra||{}));
+const DUSK = 'flag:cg_saw_house?cg_duskask';
+
+/* ---------- items that make spending money matter ---------- */
+I('cg_joss','Joss Sticks','🕯️','relic','A bundle of incense. Lit politely, it tells the unseen: "I come as a guest." Used up when lit.',{v:0,relic:true});
+I('cg_salt','Packet of Coarse Salt','🧂','relic','Old folk wisdom: a line of salt stops cold mist and wandering things. Used up when poured.',{v:0,relic:true});
+I('cg_key','Rusty Key','🗝️','relic','A small brass key, green with age. It looks as if it fits a trunk, or a chest, or a very old promise.',{v:0,relic:true});
+I('cg_battery','Spare Batteries','🔋','relic','Keeps your torch alive in the dark parts of the house. Used up when needed.',{v:0,relic:true});
+
+/* ---------- little builders ---------- */
+const o = (t, y, fx, req) => [t,'',y,fx||'xp+s','','',req||''];
+const c = (t, chk, y, fx, n, nfx, req) => [t,chk,y,fx||'xp+m',n||'It does not quite work out.',nfx||'xp+s',req||''];
+const dare = (t, mp, y, fx, req) => [t,'',y,fx||'xp+l','','',req||'',mp];   // costs Courage, bigger reward
+const L = (reg, title, em, text, ...opts) => [reg, title, em, text, opts];
+
+/* ================= ACTION ENCOUNTERS (anywhere in Singapore) ================= */
+const ACT = [
+L('any','Stray Dog Chase','🐕',`A big, loud, brown dog bursts out from behind the bin chute and charges straight at you, barking. Its tail is wagging, but it looks like it wants to play very, very fast.`,
+ c('Sprint for the nearest bench.','DEX 8 dodge',`You leap, scramble up and perch on the bench like a cat. The dog skids below, delighted, and a passing auntie laughs.`,'xp+m mp+2','The dog catches your shoelace and drags you in a happy circle. Only your pride is hurt.','xp+s hp-1'),
+ o('Freeze and offer a sweet.',`The dog sits, sniffs, and gently takes the sweet. You have made a friend for the day.`,'xp+m mp+2 -cg_sweets','item:cg_sweets'),
+ o('Stand still and let it sniff you.',`After a very long ten seconds, it licks your hand and trots away.`,'xp+s mp+1')),
+L('any','Pickpocket!','🏃',`In the crowded kopitiam, a hand slides out of the crowd, snatches your pocket money and bolts for the door. Everybody is looking the other way.`,
+ c('Chase him down the road.','DEX 9 dodge',`You weave through tables, vault a stool and grab his shirt at the kerb. He drops your money, pale and panting, and the uncles clap.`,'xp+l mp+2 gold+4 flag:cg_kind','He is faster. You lose him at the corner, and a few dollars with him.','xp+s hp-1 gold-4'),
+ dare('Shout "THIEF!" in your loudest voice.',2,`The whole kopitiam jumps up. The thief panics and drops everything, and two uncles pin him to a chair until the security guard arrives.`,'xp+l gold+5 flag:cg_kind'),
+ o('Let it go and check your bag.',`Annoying, but you still have your phone and your wits. You carry on, a bit poorer.`,'xp+s gold-3')),
+L('any','Lost Wallet','👛',`On the pavement lies a fat leather wallet. Inside: an IC, a bus pass, and a lot of cash. A cleaner nearby is pretending not to look.`,
+ o('Hand it in at the nearest counter.',`The owner arrives, trembling with relief, and presses an ang pow into your hand: "Good child. Take, take."`,'xp+l gold+10 mp+3 flag:cg_kind'),
+ c('Find the owner yourself using the IC.','INT 8 lore',`You find his block, knock, and the owner nearly weeps. He gives you a thick red packet, and a promise of free fishballs for life.`,'xp+l gold+12 mp+3 flag:cg_kind','You give up and hand it to the guard instead. They thank you warmly.','xp+m gold+4 flag:cg_kind'),
+ o('Quietly keep the cash.',`It feels heavy in your pocket, and heavier in your stomach. You are $10 richer and a good deal less happy.`,'gold+10 mp-3 flag:cg_rude')),
+L('any','The Claw Machine','🧸',`At the arcade, a claw machine holds a plush toy that looks exactly like a Merlion. A boy has just lost four dollars to it, and is staring at it sadly.`,
+ c('Pay $2 and try your luck.','DEX 8 craft',`The claw drops, grabs, lifts... and the Merlion tumbles into the chute! The boy cheers louder than you do.`,'gold-2 xp+m mp+3 +cg_merlion','The claw closes on air. The Merlion looks smug.','gold-2 xp+s','gold:2'),
+ o('Watch the boy and learn the trick.',`He tells you: "Go for the tag, not the head." You tuck that away for later.`,'xp+m'),
+ o('Walk on. Arcades eat money.',`Wise. Your pocket money survives.`,'xp+s')),
+L('any','Sudden Downpour','🌧️',`The sky goes black in ten seconds. Then it falls on you like a bucket: a proper Singapore thunderstorm, with drains that overflow in minutes. You are two blocks from shelter.`,
+ o('Open your umbrella and wade on.',`Your umbrella fights the wind, and wins. You arrive damp but triumphant.`,'xp+m mp+1','item:cg_umbrella'),
+ c('Run for the covered walkway.','DEX 8 dodge',`You splash, slide and dive under the roof just as the sky opens fully. Everyone cheers.`,'xp+m mp+2','You are soaked to the skin before you arrive, and sneeze for an hour.','xp+s hp-2'),
+ o('Buy a poncho from the 24-hour shop ($3).',`Bright yellow, very ugly, completely waterproof. You walk home like a banana, perfectly dry.`,'gold-3 xp+m mp+2','gold:3'),
+ o('Wait it out under the nearest tree.',`Bad idea: lightning is shy of nobody. You move at once, a bit rattled.`,'xp+s hp-1')),
+L('any','Dare at the Void Deck','🌚',`Three older kids block your way at the void deck. "Hey. Heard you are looking for ghosts. Dare you to knock on the door of the empty flat on the top floor. At night. Alone."`,
+ dare('Take the dare. (Costs Courage)',3,`You climb eleven flights in the dark, knock three times and wait. Silence. Then, behind the door, something taps back, once. You run down the stairs faster than you have ever run, and the older kids stare at you with new respect. One hands you a packet of sweets.`,'xp+l gold+6 mp+2 flag:cg_kind'),
+ c('Talk your way out of it.','CHA 8 persuade',`"Ghosts are not for fun," you say. "They are for being polite to." They are strangely impressed.`,'xp+m mp+2','They laugh at you, but let you pass.','xp+s'),
+ o('Walk away and take the long way home.',`Nobody is chasing you. Nobody is impressed either, but you are in one piece.`,'xp+s')),
+L('any','Fortune Teller','🔮',`Outside the temple, an old man with a tiny table and a bird in a cage says: "Pick a card, young one. Five dollars. The bird chooses, I only explain."`,
+ o('Pay $5 and let the bird choose.',`The bird picks a card with a picture of a lantern. "A light for the lost," says the old man. "Something small, bought for a few dollars, will matter more than something expensive." He winks. "Also: be nice to cats."`,'gold-5 xp+l mp+3 flag:cg_hint','gold:5'),
+ c('Haggle him down to $2.','CHA 8 persuade',`He sighs dramatically, takes $2, and the bird picks a card. It shows a bell. "Ring it when you need help," he says. You do not know what he means yet.`,'gold-2 xp+m mp+2 flag:cg_hint','He folds his arms. "Five. Or nothing."','xp+s','gold:2'),
+ o('Just pat the bird and move on.',`The bird pecks your finger, gently, in what you decide is a friendly way.`,'xp+s')),
+L('any','Temple Donation','🛕',`At a neighbourhood temple, an auntie sits at a table with a tin and a stack of red thread bracelets. "For good luck on your journey," she says. "Donate what your heart says."`,
+ o('Donate $3 and take a bracelet.',`She ties the red thread on your wrist and murmurs a blessing. You feel, for the next little while, a bit braver and a bit luckier.`,'gold-3 xp+m mp+4 st:bless3 flag:cg_respect','gold:3'),
+ o('Donate $1 politely.',`She smiles. "Small coin, big heart." She gives you an orange.`,'gold-1 xp+s mp+2 +cg_oranges','gold:1'),
+ o('Thank her, and watch the incense smoke.',`The smoke curls up into the rafters and vanishes. You breathe slowly, and feel steadier.`,'xp+s mp+2')),
+L('any','Lift Stuck!','🛗',`The lift jolts, and stops, between the 6th and 7th floors. The lights flicker. A small child beside you begins to cry, and the auntie with the shopping bags starts to mutter prayers.`,
+ dare('Stay calm and lead everyone in a breathing count. (Costs Courage)',2,`"In for four, out for four," you say, and count aloud. By the time the technician arrives, everyone is calm, and the child is laughing at your counting voice. The auntie gives you a mandarin orange.`,'xp+l mp+2 +cg_oranges flag:cg_kind'),
+ c('Press the alarm and call the hotline.','INT 8 craft',`A clear voice answers: "Please stay calm, help is coming." You relay it to everyone, and the lift moves in three minutes.`,'xp+m mp+2','The hotline is busy. You wait with everyone, and eventually the lift starts again.','xp+s'),
+ o('Sit down and wait quietly.',`Eleven minutes. The lift hums back to life. Your knees are a little shaky.`,'xp+s mp+1')),
+L('any','The Cat on the Ledge','🐈',`High up on the third-floor ledge, a tabby cat is mewing in despair. A small crowd has gathered. A boy says, "It has been stuck since this morning!"`,
+ c('Climb up and bring it down.','DEX 9 climb',`Inch by inch, you edge along the railing and scoop the cat into your arms. The crowd erupts. The cat bites your sleeve in thanks.`,'xp+l mp+3 flag:cg_kind','You get close, but the cat bolts, and eventually finds its own way down. At least it is safe.','xp+m hp-1'),
+ o('Call the town council helpline.',`A uniformed officer arrives in ten minutes with a big net. The cat is rescued. The boy thanks you.`,'xp+m mp+2 flag:cg_kind'),
+ o('Leave a bowl of milk and a sardine on the ground.',`The cat sniffs the air, and, with great dignity, jumps down for dinner.`,'xp+m mp+2 flag:cg_kind')),
+L('any','Monitor Lizard!','🦎',`By the canal, a metre-long monitor lizard is sunning itself in the middle of the path. It looks at you with the expression of a landlord.`,
+ o('Walk very slowly around it.',`It does not move. It does, however, watch you the whole way.`,'xp+m mp+1'),
+ c('Take a good photo from a safe distance.','DEX 8 craft',`The lizard poses perfectly. A passing uncle whispers, "That is a good one, boy!"`,'xp+m mp+2','Blurry. The lizard looks like a log.','xp+s'),
+ dare('Walk right past it, eyes forward. (Costs Courage)',2,`You do not blink. It does not blink. Eventually it slides into the water, bored. You have won, apparently.`,'xp+l mp+1')),
+L('any','Chased by Macaques','🐒',`A troop of long-tailed macaques spots the packet in your bag. Suddenly, one is on the railing, one is on your head, and one is eyeing your pocket.`,
+ c('Hold the bag high and back away calmly.','WIS 8 resist',`They lose interest, one by one. A ranger gives you a thumbs-up from the path.`,'xp+m mp+2','One monkey snatches the packet and vanishes. Another sniffs your shoe.','xp+s -cg_sweets'),
+ o('Throw a few sweets far away to distract them.',`They scramble after the sweets. You walk off, light-footed.`,'xp+m -cg_sweets','item:cg_sweets'),
+ o('Stay perfectly still and look away.',`They sniff, climb, sniff again, and wander off. A dignified retreat.`,'xp+s')),
+L('any','Missing the Last Bus','🚌',`You run for the last bus of the night, and it pulls away just as you reach the stop. The next one is forty minutes away. It is dark, and a bit drizzly.`,
+ o('Take a taxi ($8).',`The driver chats the whole way and drops you at the door. A warm, dry, expensive solution.`,'gold-8 xp+m mp+2 hp+3','gold:8'),
+ c('Run to the next stop and catch it there.','CON 8 endure',`You sprint two stops, gasping, and leap on just as the doors close. The driver gives you a long look. You wave.`,'xp+m mp+2 hp-1','You miss it by a few seconds, and have to wait in the cold.','xp+s hp-2'),
+ o('Wait at the stop and watch the rain.',`Forty minutes. You count raindrops, listen to your own thoughts and feel quite grown-up.`,'xp+s mp+1')),
+L('any','Hawker Stall Emergency','🍳',`The uncle at the char kway teow stall has twisted his wrist, and a long queue is forming. His wok is smoking. He looks at you desperately: "Boy! Can you hold the wok for two minutes?"`,
+ c('Take the wok and keep it moving.','DEX 8 craft',`You toss the noodles like a pro, and the queue cheers. The uncle presses $6 and a free plate into your hand: "Hero!"`,'xp+l gold+6 hp+8 mp+2 flag:cg_kind','You nearly set fire to the noodles, but he rescues them in time. He gives you a free plate anyway.','xp+m hp+6'),
+ o('Run to fetch ice from the next stall.',`You return with a bag of ice and a cold flannel. The uncle sighs with relief.`,'xp+m gold+2 flag:cg_kind'),
+ o('Join the queue and wait.',`The uncle recovers eventually. The noodles are worth it.`,'xp+s hp+4 gold-2','gold:2')),
+L('any','Power Cut','💡',`With a loud *clunk*, every light on your block goes out. The lift stops. The stairwell is pitch black. Your friends are somewhere above you, calling out.`,
+ o('Switch on your torch.',`The beam finds every step. You lead everyone up the stairs, slowly, and are thanked by two grandmas.`,'xp+m mp+3 flag:cg_kind','item:cg_flashlight|item:cg_penlight'),
+ c('Use your phone and count the steps.','WIS 8 resist',`Counting soothes you. Twelve, thirteen, fourteen. You find the right floor and the right door.`,'xp+m mp+2','You lose count and take a long, shaky time.','xp+s mp-1'),
+ o('Sit on the stairs and wait for the lights.',`Five minutes of dark, a few jokes shouted between floors, then *click*, the lights return. Everybody cheers.`,'xp+s mp+1'),
+ dare('Feel your way up in the dark, hand on the wall. (Costs Courage)',2,`Inch by inch, you climb in total darkness. Somewhere on the way, you pass a hundred small noises that turn out to be only a building breathing. At the top, you laugh with relief.`,'xp+l mp+2')),
+L('any','Phone Scam Call','📞',`Your phone rings with an unknown number. A smooth voice says: "Your parent has had an accident. Quickly, transfer $200 or they will be in trouble." Your heart thuds.`,
+ o('Hang up and call your parent directly.',`They answer cheerfully, buying vegetables at the market. It was a scam. You have saved yourself a lot of trouble.`,'xp+l mp+3 flag:cg_smart'),
+ o('Ask the caller a trick question.',`"What is my favourite food?" you say. Silence. Click. The line goes dead.`,'xp+m mp+2'),
+ o('Ignore the call and walk on.',`It stops ringing. A good lesson: never send money because a stranger says hurry.`,'xp+s')),
+L('any','Street Football','⚽',`A game of street football is being played in the carpark: three-a-side with trolley bays for goals. A boy shouts: "We are one short! Come on, play!"`,
+ c('Play and try to score.','DEX 8 dodge',`You dribble past a very surprised defender and smash it between two trolleys. GOAL! The whole court yells your name.`,'xp+l mp+3 hp-1 flag:cg_kind','You trip over the ball, but your team scores on the rebound anyway.','xp+m hp-1'),
+ o('Be the goalkeeper.',`Dive, scramble, hug. You stop three shots and your team loves you.`,'xp+m mp+2 hp-1'),
+ o('Cheer from the sidelines.',`Your cheering is excellent. Somebody gives you half an orange.`,'xp+s mp+2')),
+L('any','Pasar Malam Crush','🏮',`The night market is a river of people, smoke, bright bulbs and shouting stallholders. A moment ago your friend was beside you. Now they are nowhere.`,
+ c('Climb on a crate and scan the crowd.','WIS 8 survive',`There! A flash of a familiar cap near the muah chee stall. You elbow your way through and find them, shaken and relieved.`,'xp+m mp+2 bond:cg_priya','Everything looks the same. You eventually run into them near the exit.','xp+s mp-1'),
+ o('Stay put and call their name.',`Five minutes later, they find you, safe and a little teary. "Next time, hold hands," says a passing auntie.`,'xp+m mp+1'),
+ o('Buy two bubble teas while you wait ($4).',`Sweet pearls, cold tea. They find you by the smell. You drink together, laughing.`,'gold-4 xp+m mp+4 hp+3','gold:4')),
+L('any','Wild Boar at Punggol','🐗',`In the long grass by the coast, a wild boar and her piglets crash out of the bushes onto the path. She stares. You stare. A hundred kilos of mother boar do not look friendly.`,
+ o('Back away slowly and quietly.',`Step, step, step. She snorts, turns and herds her piglets into the trees.`,'xp+m mp+1'),
+ c('Climb the nearest fence.','STR 8 climb',`You scramble up in two seconds flat. The boar looks up at you, bored, and goes back to eating.`,'xp+m mp+2','You scramble, but your trainer catches the wire and you tumble to the ground, shaken.','xp+s hp-2'),
+ dare('Stand tall and make yourself big. (Costs Courage)',3,`You hold your ground, arms wide, and speak firmly. The boar considers you, and then, grudgingly, decides you are not worth the trouble. She leaves.`,'xp+l mp+1')),
+L('any','Otters Steal Lunch','🦦',`A family of otters pops out of the canal, whiskers twitching. Before you can say "shoo", one has run off with your sandwich, and the rest are eyeing your bag.`,
+ o('Laugh and let them have it.',`They munch happily on the bank, ten tiny faces. A passer-by takes a photo and sends it to you: instantly your favourite picture.`,'xp+m mp+3'),
+ c('Retrieve your sandwich.','DEX 8 dodge',`You dart in, grab one end, and the otter lets go, with a squeak of outrage. You are a sandwich hero.`,'xp+m mp+2','The otter has already eaten it. Gone.','xp+s'),
+ o('Offer them a few fishballs ($2).',`Otters are polite for fishballs. They accept, squeak and slip back into the water.`,'gold-2 xp+m mp+3','gold:2')),
+L('any','Stranger With Sweets','🍬',`A friendly man leans out of a parked van. "Hello! Come and look at what I have. I will give you a lift to Changi, free." He smiles too widely.`,
+ o('Say no firmly and walk away.',`You walk faster, find a security guard and tell him. The van drives off. You did exactly the right thing.`,'xp+l mp+3 flag:cg_smart'),
+ o('Run into the nearest shop and ask for help.',`The shopkeeper takes down the plate number. You are shaken, and very safe.`,'xp+m mp+2 flag:cg_smart'),
+ o('Take a photo of the van and go to a security guard.',`The guard thanks you and calls the police. Nobody is more careful than you.`,'xp+m mp+2')),
+L('any','Wet Market Slip','🐟',`The floor of the wet market is slick with water and fish scales. You are carrying a heavy bag of vegetables for {guardian} when your foot slides.`,
+ c('Catch yourself on a stall and keep the bag.','DEX 8 dodge',`You do the splits, save the bag and stand up red-faced. The fishmonger gives you a thumbs-up.`,'xp+m mp+2','You land in a heap, with a bruised elbow and a cabbage on your head. Everyone laughs, kindly.','xp+s hp-2'),
+ o('Walk slowly, holding the rail.',`Step by cautious step. The market is a very slippery place for a very careful kid.`,'xp+s'),
+ o('Buy a pair of rubber slippers ($3).',`A pair of bright blue slippers. They grip like glue. Your day is much safer.`,'gold-3 xp+m mp+2','gold:3')),
+L('any','Kopitiam Uncle\'s Riddle','☕',`At a corner kopitiam, an old uncle slides a cup of kopi across the table. "Answer my riddle, and the kopi is free. What has a face and two hands, but no arms or legs?"`,
+ o('"A clock!"',`"Smart kid!" He pushes the cup and a kaya toast to you. "Free. Nobody gets it these days."`,'xp+m hp+6 mp+3'),
+ o('"A person!"',`"Hm, close," he says gently. "Think about the time." He lets you try again, and still gives you a toast for trying.`,'xp+s hp+3'),
+ o('Pay $2 for the kopi and chat.',`Sweet, strong, steaming. The uncle tells you three stories, and one of them is about a lantern on the beach.`,'gold-2 xp+m mp+3 hp+4','gold:2')),
+L('any','Flash Flood at the Drain','🌊',`The drain by the playground is a brown torrent. A little girl\'s ball has floated into it, and she is leaning dangerously over the edge to catch it.`,
+ o('Shout at her to stay back and fetch the ball with a stick.',`You fish it out with a branch, and hand it back. She hugs it, and then you. "My hero."`,'xp+m mp+3 flag:cg_kind'),
+ c('Grab her hand and pull her to safety.','STR 8 endure',`You yank her back just in time. She trembles, then smiles, wet to the knees.`,'xp+l mp+3 flag:cg_kind','You both slip, but you land on the grass, soaked and safe.','xp+m hp-1 flag:cg_kind'),
+ o('Call an adult.',`A nearby uncle arrives immediately, stern and sensible. You did the right thing.`,'xp+m mp+2 flag:cg_kind')),
+L('any','Lucky Charm Seller','📿',`A man with a tray of charms stops you at the MRT: "Special charm! Protects from ghosts! Only $6!" His charms look suspiciously identical to the ones in the shop next door.`,
+ o('Buy one ($6).',`It smells of pine and plastic. It does not protect you from anything, but it makes you feel better.`,'gold-6 xp+s mp+3','gold:6'),
+ c('Politely test his claim.','INT 8 lore',`"If it protects from ghosts," you say, "why are you still selling it?" He laughs and gives you a free sticker.`,'xp+m mp+2','He is not convinced. You walk on.','xp+s'),
+ o('Politely decline.',`Smart. Your money goes further elsewhere.`,'xp+s mp+1')),
+L('any','Ang Pow Aunties','🧧',`A group of aunties in matching floral blouses crowd round you at the void deck. "So thin! Eat! Take this!" One presses a red packet into your hand. Another gives you a bag of peanuts.`,
+ o('Thank them, and take the packet.',`There is $5 inside. You are $5 richer and have been pinched on both cheeks.`,'xp+s gold+5 mp+2'),
+ o('Help carry their shopping bags.',`Each auntie adds a coin to your hand by the time you reach the lift. Kindness pays.`,'xp+m gold+8 mp+3 flag:cg_kind'),
+ o('Smile and slip away politely.',`The aunties call blessings after you all the way to the stairwell.`,'xp+s mp+1')),
+L('any','The Stairwell Echo','🌀',`Walking up the stairwell of an old block, you hear footsteps matching yours, a half-second behind. When you stop, they stop. When you go on, they go on.`,
+ dare('Turn around and shout "Who is there?" (Costs Courage)',2,`Your voice booms. The footsteps stop. A moment later a very flustered neighbour peeps round the corner holding his shopping and says, "Aiyoh, sorry, sorry!" You laugh until you cry.`,'xp+l mp+2 gold+2'),
+ c('Walk on and ignore it.','WIS 8 resist',`Step, step, step. At the top the echo fades, and you realise it was only your own sound bouncing back.`,'xp+m mp+2','Your heart pounds all the way up, but you reach the top.','xp+s mp-1'),
+ o('Take the lift instead.',`It takes two minutes longer. Your nerves are grateful.`,'xp+s')),
+L('any','Phone Battery 3%','🔋',`Your phone beeps: 3% battery. You need to message {guardian} that you are on your way. The only plug nearby is in a shop, and the shopkeeper eyes you hopefully.`,
+ o('Buy a drink ($2) and charge while you sip.',`Twenty minutes of sipping, a message sent and a thumbs-up received. Everything is fine.`,'gold-2 xp+m mp+3 hp+3 flag:cg_told_adult','gold:2'),
+ o('Send a quick message now, before it dies.',`"Coming home, don't worry." Send. The screen goes dark a second later. Perfect timing.`,'xp+m mp+2 flag:cg_told_adult'),
+ o('Find a public charging point.',`There is one at the library. It takes twenty minutes, but costs nothing.`,'xp+s mp+1'))
+];
+G.miniArch('cg_action', ACT);
+
+/* ================= HAUNT ENCOUNTERS (inside the house) ================= */
+const HAUNT = [
+L('cg_house','A Cold Spot','🥶',`In the middle of the corridor, the air turns icy, like stepping into a fridge. Your breath fogs. Something is standing there, close, and listening.`,
+ o('Light a joss stick politely.',`The thin smoke curls straight up, and the cold lifts. A faint, shy "thank you" rustles by your ear.`,'-cg_joss xp+l mp+4 flag:cg_respect','item:cg_joss'),
+ dare('Walk straight through it. (Costs Courage)',2,`It is like wading through a cold stream. On the other side, you feel braver, and strangely proud.`,'xp+l mp+2'),
+ o('Say "Excuse me" and go round it.',`The cold shifts aside, just a little. Manners work on the unseen too.`,'xp+m mp+1 flag:cg_respect')),
+L('cg_house','Paper Boats Rustle','⛵',`All along the skirting boards, little paper boats begin to rustle and slide across the floor, forming a long, pale line down the corridor. They are pointing somewhere.`,
+ c('Follow the line of boats.','WIS 8 survive',`The boats lead you to a loose floorboard. Under it: a handful of old coins and a rusty key.`,'xp+l gold+6 mp+2 +cg_key','The boats scatter and fall still, as if they lost interest.','xp+s'),
+ o('Fold a paper boat of your own and add it.',`Your boat joins the line. The whole fleet gives a faint rustle of approval.`,'xp+m mp+3 flag:cg_respect'),
+ o('Step carefully over them.',`You tiptoe over, careful not to crush a single one.`,'xp+s')),
+L('cg_house','Giggles Behind the Door','😶',`Behind a closed door, someone giggles. A small, delighted giggle, as if from a child who has been waiting a very long time for someone to play.`,
+ dare('Open the door and say "Found you!" (Costs Courage)',2,`The room is empty, but a tiny paper boat is waiting in the middle of the floor, with a little scrawl on it: "Again?" Something giggles in delight.`,'xp+l mp+3 gold+3 flag:cg_kind'),
+ o('Knock three times politely.',`The giggling stops. After a moment, a very small knock answers. Three times.`,'xp+m mp+2 flag:cg_kind'),
+ o('Keep walking.',`The giggles follow you down the corridor, a little disappointed.`,'xp+s')),
+L('cg_house','The Torch Dies','🔦',`Your torch flickers, dims, and goes out. The dark pours in from every side. Something shifts in the corner, and the temperature drops by five degrees.`,
+ o('Slot in the spare batteries.',`Click. Light! The beam is strong and steady. The shadows jump back, offended.`,'-cg_battery xp+l mp+3','item:cg_battery'),
+ o('Use your glow bracelet.',`A soft glow pushes the dark back to arm\'s length. It is enough.`,'xp+m mp+2','item:cg_glowband'),
+ o('Feel your way back along the wall to the door.',`Slow, careful, with one hand on the plaster. You reach the front door and the cool night air, and, after a minute, your nerves.`,'xp+s mp-1'),
+ dare('Stand in the dark and count to ten. (Costs Courage)',2,`One, two, three... the dark is full of breathing. Seven, eight, nine, ten. Slowly, your eyes adjust. You see a faint grey path, and follow it out.`,'xp+l mp+2')),
+L('cg_house','The Whispering Mirror','🪞',`A tall mirror leans against the wall. In it, you see yourself, and, a little behind you, a small figure that is not in the room. It whispers something. You cannot quite catch the words.`,
+ c('Listen carefully to the whisper.','WIS 9 spirit',`"Four-fifteen," it whispers. "Four-fifteen." You grab your notebook and write it down. That must mean something.`,'xp+l mp+2 flag:cg_knows_time','The whisper fades before you can catch it.','xp+s mp-1'),
+ o('Turn the mirror to face the wall.',`It is easier to think without being watched. The whisper stops, politely.`,'xp+m mp+1'),
+ o('Wave at the reflection.',`The small figure waves back. Shy, unthreatening, a little pleased.`,'xp+m mp+2 flag:cg_kind')),
+L('cg_house','Music Box in the Dark','🎵',`A faint tune tinkles from a cupboard: a music box, playing slowly, with every other note missing. It is the lullaby. Something about it makes you want to sit down and listen.`,
+ o('Sit and listen to the whole tune.',`When the box winds down, you feel calm and sad and strangely refreshed.`,'xp+m mp+4 hp+3 flag:cg_lullaby'),
+ c('Open the cupboard and wind the box.','DEX 8 craft',`You wind it carefully. The notes fill in, one by one, and the whole lullaby plays. A sigh of relief rustles through the house.`,'xp+l mp+3 flag:cg_lullaby','The key is stiff, and the music box stays silent.','xp+s'),
+ o('Shut the cupboard and walk on.',`The tune follows you for a few steps, then drops away.`,'xp+s')),
+L('cg_house','Wet Footprints','👣',`A set of small wet footprints leads across the floor, dripping, and stops at a closed door. The puddle by the door is still growing.`,
+ o('Follow them to the door.',`Behind the door, a cold draught carries a smell of sea and salt. You hear someone crying softly.`,'xp+m mp+1 flag:cg_knows_storm'),
+ o('Mop the puddle with your sleeve. It seems right.',`A silly gesture, but the footprints fade, and something sighs in relief.`,'xp+m mp+3 flag:cg_kind'),
+ dare('Step into a footprint and stand there. (Costs Courage)',2,`It is icy-cold. For a heartbeat, you see through someone else\'s eyes: a beach, a storm, a small hand reaching for a boat. Then it is gone.`,'xp+l mp+2 flag:cg_knows_storm')),
+L('cg_house','The Rocking Chair','🪑',`A rocking chair in the corner rocks gently, back and forth, though nobody sits in it. A faint smell of jasmine and old rain drifts around it.`,
+ o('Say "Good evening, Madam."',`The rocking pauses, then resumes at a gentler pace. You feel noticed, and not unwelcome.`,'xp+m mp+3 flag:cg_respect'),
+ c('Search the chair for anything hidden.','DEX 8 craft',`Under the cushion: a few old coins and a faded hair ribbon, tied in a bow. The chair gives a creak of approval.`,'xp+l gold+5 mp+2','Dust and a lot of cobwebs.','xp+s'),
+ o('Tiptoe past.',`The chair keeps rocking, patient, as if used to being passed.`,'xp+s')),
+L('cg_house','The Clock Strikes Thirteen','🕰️',`Somewhere deep in the house a clock strikes. One, two, three... you count along. Twelve. Then, impossibly, thirteen. A cold draught slams every door in the corridor.`,
+ dare('Stand your ground and count the doors that slam. (Costs Courage)',2,`Seven doors. One of them is the nursery, still shut. You note which. The slamming dies away.`,'xp+l mp+2 flag:cg_knows_time'),
+ o('Duck into the nearest alcove and wait it out.',`The doors slam, the dust settles and, after a minute, everything is quiet again.`,'xp+s mp+1'),
+ o('Run back toward the entrance.',`You do not stop until you can see the casuarinas. A little shamed, a little relieved.`,'xp+s hp-1 mp-1')),
+L('cg_house','Mist Rising','🌫️',`Cold white mist rolls up from under the doors and floods across the floor, rising ankle-deep, then knee-deep. It smells of salt. It is very sleepy mist.`,
+ o('Pour a line of salt across the doorway.',`The mist stops dead at the line, curls, and recedes like a polite guest told to wait outside.`,'-cg_salt xp+l mp+3 flag:cg_respect','item:cg_salt'),
+ c('Hold your breath and walk through quickly.','CON 8 endure',`You dash through, eyes streaming, and reach clear air. It was all very silly, and very cold.`,'xp+m mp+1','You breathe in a lungful. Everything goes soft for a moment, and you stumble out dazed.','xp+s hp-2 mp-2'),
+ o('Climb on a chair and wait for it to pass.',`The mist drifts under the chair like a slow tide. After ten minutes, it has gone.`,'xp+s mp+1')),
+L('cg_house','A Chill Hand on Your Shoulder','🖐️',`Something cold and very light settles on your shoulder: a hand, small and curious. You do not turn round.`,
+ dare('Turn round and look. (Costs Courage)',3,`A little girl in a white nightdress stands there, faint as breath on glass. She puts a finger to her lips, then points to the stairs, and is gone.`,'xp+l mp+2 flag:cg_dream_mei'),
+ o('Say "Hello, Mei" softly.',`The hand squeezes your shoulder, once, and lifts. A tiny, delighted giggle.`,'xp+m mp+3 flag:cg_kind','flag:cg_knows_names'),
+ o('Stand perfectly still and breathe.',`Four seconds. Eight. The hand lifts, politely.`,'xp+s mp+1')),
+L('cg_house','The Locked Trunk','🧳',`A big wooden trunk sits at the foot of a bed, its brass lock green with age. Something inside it shifts, softly, as if someone is turning over in sleep.`,
+ c('Pick the lock with your pen or pin.','DEX 9 craft',`Click! Inside: a pile of old blankets, a child\'s hair-ribbon and a little tin of coins.`,'xp+l gold+8 mp+2','The lock refuses. Something inside sighs, resigned.','xp+s'),
+ o('Use the old key you found.',`It fits perfectly. Inside, among tiny dresses and old toys, is a tin of coins.`,'xp+l gold+8 mp+2','item:cg_key'),
+ o('Leave it alone.',`Some things are not yours to open.`,'xp+s flag:cg_respect')),
+L('cg_house','A Voice Counting Down','🔢',`A thin voice, from somewhere inside the walls, begins counting backwards. "Ten... nine... eight..." It is a child\'s voice. It sounds delighted.`,
+ dare('Count with it, and find where it ends. (Costs Courage)',2,`"Three... two... one!" You throw open the nearest door. Inside, a ring of paper boats spins slowly in the air, and a very small voice whispers: "You found me!"`,'xp+l mp+3 gold+4 flag:cg_kind'),
+ o('Hide under the stairs until it stops.',`It ends at zero. Nothing happens. A tiny sigh of disappointment.`,'xp+s mp+1'),
+ o('Call "Ready or not, here I come!"',`The voice squeals with laughter, and the house seems to relax around you.`,'xp+m mp+3 flag:cg_kind'))
+];
+G.miniArch('cg_haunt', HAUNT);
+
+/* ---------- region weights: more action, less filler ---------- */
+const W = (r, a, l, t, k, s, f) => { const R = G.regions[r]; if (R) R.enc = { cg_action:a, cg_local:l, cg_trivia:t, cg_kind:k, cg_scare:s, cg_food:f }; };
+W('cg_tampines', 6, 4, 2, 2, 3, 1);
+W('cg_changi',   5, 4, 2, 2, 4, 1);
+W('cg_city',     5, 4, 3, 2, 2, 2);
+W('cg_eastcoast',5, 4, 2, 2, 3, 1);
+W('cg_ubin',     5, 4, 2, 2, 4, 1);
+W('cg_festival', 4, 4, 2, 2, 5, 1);
+W('cg_kampong',  3, 5, 1, 3, 3, 0);
+W('cg_oldcity',  5, 4, 3, 2, 2, 1);
+W('cg_nature',   6, 3, 2, 2, 3, 0);
+G.regions.cg_house.enc = { cg_haunt:7, cg_scare:3, cg_action:1 };
+
+/* ================= SUPPLY STALLS: where money buys what the house needs ================= */
+const buy = (label, cost, item, msg, tag) => ({ t:`${label} ($${cost}).`, hide:true, r:`gold:${cost}&!sv:${tag}`, y:[msg, `gold-${cost} +${item} svflag:${tag} stayc`] });
+S_('cg_stall_a','Uncle Lim\'s Offering Stall','beach|🕯️ 🛍️',
+`At the edge of Changi Beach, Uncle Lim has set up a little folding table: joss sticks, packets of salt, oranges and a tin of loose change. "Visitors to the house must be prepared," he says. "Spend a little now, and the house will cost you less later."\nYou have $$$GOLD$ in your pocket.`.replace('$$$GOLD$','a little'),[
+ buy('Buy a bundle of joss sticks',2,'cg_joss','Uncle Lim wraps them in a newspaper. "Light one at the door, politely. It says: I am a guest."','joss'),
+ buy('Buy a packet of coarse salt',1,'cg_salt','"For the mist," he says. "A line across the door. Do not ask me how I know."','salt'),
+ buy('Buy a bag of oranges',3,'cg_oranges','A fat bag of mandarin oranges. A polite offering to any visitor from the other side.','oranges'),
+ {t:`Chat with Uncle Lim and save your money.`,y:[`He pours you a cup of barley water. "A sensible kid," he says. "Everything in the house is cheaper if you are polite."`,'xp+s mp+2']} ]);
+S_('cg_stall_b','The Sundry Shop at Changi Village','hawker|🛒 🔦',
+`A little provision shop at Changi Village sells everything a brave kid needs: batteries, sweets, plasters, Tiger Balm and Milo. The shopkeeper, a cheerful aunty, taps the counter. "Going to the beach after dark? Take a torch. Take a drink. Take courage, if we sell it."\nPrices are on a handwritten sign.`,[
+ buy('Buy spare batteries',3,'cg_battery','Four little batteries, wrapped in a rubber band. Light, when you need it most.','bat'),
+ buy('Buy a Milo packet (restores Courage)',2,'cg_milo','Chocolate, malt and a little comfort. A good thing to open when your knees knock.','milo'),
+ buy('Buy a jar of Tiger Balm',3,'cg_balm','Sniff, rub, feel braver. A small jar, very strong.','balm'),
+ buy('Buy a roll of plasters',2,'cg_plaster','A strip of plasters. They always come in handy.','plast'),
+ {t:`Browse the shelves, but spend nothing.`,y:[`The aunty hands you a sweet anyway. "Come back when you are rich," she says, and laughs.`,'xp+s mp+1']} ]);
+
+/* ================= HOUSE VISIT 1: THE GATE AND THE GARDEN ================= */
+G.chapter('cgV1',{ story:'changi', n:'Chapter 3: The First Night at the House', sub:'Garden, gate and paper boats', ch:2, region:'cg_house', art:'bungalow|🏚️ 🌙', age:11, btn:'Go to the gate',
+  text:`The house did not look like a trap. It looked like a place waiting for a visitor.\nUncle Lim sets up his little stall at the edge of the beach and watches you with kind, wary eyes. "You may go as far as the garden," he says. "No further. Not yet. The first visit is for looking, and for listening. Come back before midnight."\nThe sun is gone. The mist is rising. The gate is waiting.`,
+  beats:()=>['cgV1_intro','cg_stall_a'].concat(G.mix(['cg4_gate','cg4_garden','cgV1_swing','cgV1_maze','cg4_boathouse','cgV1_madam'],8,{nocamp:true}),['cgV1_retreat']) });
+S_('cgV1_intro','Dusk on the Beach','beach|🌅 🌲',
+`The tide is out. The casuarinas hiss. At the edge of the trees, the white house waits, impossibly clear now, its black beams glowing in the last light.\nYour heart is beating hard. Your hands are damp. But you came here for Aiman, and for a lady who asked for manners.`,[
+ {t:`Take a deep breath and walk toward the gate.`,y:[`One step. Two. The sand turns to old grass, and the grass to brick. The house grows larger with every pace.`,'xp+m mp+2 tod:night flag:cg_saw_house']},
+ {t:`Light your torch and check your gear first.`,r:'item:cg_flashlight|item:cg_penlight',y:[`Torch, bottle, notebook, a few coins. Everything is where it should be.`,'xp+m mp+3 tod:night flag:cg_saw_house']},
+ {t:`Ask a friend to wait at the treeline.`,r:'anyally',y:[`They nod, pale but loyal. "I will count to a thousand," they say. "Then I will shout."`,'xp+m mp+3 tod:night flag:cg_saw_house']} ]);
+S_('cgV1_swing','The Swing','bungalow|🌲 🛝',
+`Under the tallest casuarina hangs a rope swing, creaking, though the air is perfectly still. A small shape sits on it, faint as a candle in fog, swinging slowly and humming. She stops when she sees you, and looks away, shy.\nA paper boat floats down from the branches and lands in your hand.`,[
+ {t:`Say "Hello" very softly.`,c:'WIS 8 spirit',y:[`The little shape peeps back, wide-eyed. "You can see me?" she whispers. Then she is gone, and the swing keeps swaying.`,'xp+l mp+3 flag:cg_dream_mei flag:cg_kind'],n:[`She vanishes with a tiny gasp, and the swing sways on its own.`,'xp+m mp+1']},
+ {t:`Give the swing a gentle push.`,y:[`It swings up and down, and a tiny voice laughs, once, from the dark. You feel as if you have passed a very small test.`,'xp+m mp+3 flag:cg_kind']},
+ {t:`Light a joss stick under the swing.`,r:'item:cg_joss',y:[`The smoke rises in a thin spiral. The swing stops, settles, and a small, grateful sigh sweeps the garden.`,'-cg_joss xp+l mp+4 flag:cg_respect']},
+ {t:`Pick up the paper boat and keep it.`,y:[`It is soft and old, folded perfectly. It feels like a promise someone forgot.`,'xp+m +cg_paperboat flag:cg_paperboat_made']} ]);
+S_('cgV1_maze','The Mist Maze','bungalow|🌫️ 🚪',
+`Past the swing, the garden thickens into a hedge maze of overgrown bougainvillea. Low mist swirls through the passages, and in the mist, a line of tiny white paper boats drifts like breadcrumbs. Some point left. Some point right. One, very small, points straight up.`,[
+ {t:`Follow the white boats.`,c:'WIS 8 survive',y:[`Left, right, left, left. The boats lead you through to a small clearing and a stone bench, where an old coin gleams in the grass.`,'xp+l gold+4 mp+2'],n:[`You wander for ten minutes. The boats seem to giggle. At last you stumble out by luck.`,'xp+m mp-1']},
+ {t:`Pour a thin line of salt to mark your path.`,r:'item:cg_salt',y:[`The mist backs away from the salt, and the maze becomes a plain garden with a single, easy path.`,'-cg_salt xp+l mp+3']},
+ {t:`Light your torch and read the way.`,r:'item:cg_flashlight|item:cg_penlight',y:[`The beam shows the path, and the hedge, and a small hand-drawn arrow on a stone.`,'xp+m mp+2']},
+ {t:`Climb up the old trellis and look from above.`,c:'STR 8 climb',y:[`From the top, you see the whole maze laid out like a map, and a clear path to the clearing.`,'xp+l mp+2'],n:[`The trellis creaks and sags. You slide down in a shower of petals.`,'xp+s hp-2']} ]);
+S_('cgV1_madam','A Lady on the Veranda','bungalow|👻 🪑',
+`At the edge of the maze, the veranda is clear. In the rocking chair sits a thin lady in a white blouse, with silver hair in a bun, looking out toward the sea. She has not moved. She does not turn her head.\n"I can hear you," says a calm, sad voice. "A child, with good manners, and a few small gifts. Come no further tonight. The house is not ready for you, and neither are you."`,[
+ {t:`"Madam, may I ask your name?"`,y:[`"Soo Lian," she says. "A long time ago, I had a family. A house. A daughter." A pause. "Come back when you have remembered how to knock."`,'xp+l mp+3 flag:cg_knows_names flag:cg_respect']},
+ {t:`"Is my friend Aiman here?"`,y:[`"He is safe," says Madam Soo. "He is asleep, upstairs. I would never hurt a child." A longer pause. "But I have not found a way to let anyone go."`,'xp+l mp+2 flag:cg_trust']},
+ {t:`Offer her oranges.`,r:'item:cg_oranges',y:[`She turns her head, just a little. "Oranges," she says, as if tasting the word. "How long since a guest brought oranges." The oranges are gone, but a warm wind brushes past you.`,'-cg_oranges xp+l mp+4 flag:cg_respect flag:cg_offering_given']},
+ {t:`Bow politely and retreat.`,y:[`"Good evening, Madam," you say. "I will be back." She makes no answer, but the rocking chair gently rocks.`,'xp+m mp+2 flag:cg_respect']} ]);
+S_('cgV1_retreat','Midnight','beach|🌌 🕛',
+`The clock in the house strikes twelve, a long, low sound. All at once, the mist rolls up and the paper boats scatter. A cold, firm hand seems to press against your back, not unkindly: out, out, out. You stumble through the gate and onto the sand.\nBehind you, the house sighs, and the lights go out one by one. Uncle Lim is waiting with a flask of barley water.`,[
+ {t:`Tell Uncle Lim everything you saw.`,y:[`He nods slowly, and says: "She has not let anyone leave. But she has not hurt anyone either. That counts for something." He passes you the flask.`,'xp+l mp+4 hp+5 flag:cgv1_done flag:cg_knows_legend tod:day']},
+ {t:`Write down every detail while it is fresh.`,r:'item:cg_notebook|item:cg_sketchbook',y:[`Gate, garden, maze, swing, veranda. You draw a rough map, and mark where you want to go next.`,'xp+l mp+3 flag:cgv1_done tod:day']},
+ {t:`Go home and sleep.`,y:[`A long bus ride, a short, deep sleep and the morning sun on your face.`,'rest xp+m flag:cgv1_done tod:day']} ]);
+
+/* ================= HOUSE VISIT 2: THE GROUND FLOOR ================= */
+G.chapter('cgV2',{ story:'changi', n:'Chapter 6: Inside the House', sub:'Veranda, hall, dining room and kitchen', ch:3, region:'cg_house', art:'bungalow|🏚️ 🕯️', age:11, btn:'Knock on the door',
+  text:`This time, the gate opens before you touch it.\nAt the top of the steps, the front door is ajar, and a faint yellow light spills out. You have been invited, or at least tolerated. What is inside is a long way from the beach, and a very long way from safe.\nUncle Lim presses a hand on your shoulder. "Remember: be polite, be brave, and be out by midnight."`,
+  beats:()=>['cgV2_intro','cg_stall_b'].concat(G.mix(['cg4_veranda','cg4_hall','cg4_dining','cgV2_cellar','cg4_kitchen','cgV2_hideseek','cgV2_madam'],9,{nocamp:true}),['cgV2_retreat']) });
+S_('cgV2_intro','Through the Door','bungalow|🚪 🕯️',
+`The front door is tall, with a brass knocker in the shape of a fish. Beyond it, a long hall of black-and-white tiles, dim and dusty, with a single oil lamp glowing on a table. Doors lead off in every direction. The air smells of jasmine, damp wood and old incense.`,[
+ {t:`Knock three times and wait.`,y:[`Knock, knock, knock. The echoes run through the house and fade. A moment later, a voice from nowhere says: "Come in."`,'xp+m mp+3 flag:cg_respect']},
+ {t:`Light a joss stick and place it by the door.`,r:'item:cg_joss',y:[`The smoke curls up. Somewhere deep inside, a tiny bell tinkles. The house relaxes, just a little.`,'-cg_joss xp+l mp+4 flag:cg_respect']},
+ {t:`Put on your torch and step inside.`,r:'item:cg_flashlight|item:cg_penlight',y:[`The beam sweeps over old portraits, a coat stand and a clock with stopped hands. Dust rises like snow.`,'xp+m mp+2']},
+ {t:`Slip in quietly without knocking.`,c:'DEX 8 sneak',y:[`You ghost through the gap. Nothing stirs. A little rude, but effective.`,'xp+m flag:cg_rude'],n:[`The floorboards groan. The house shudders, annoyed. A cold draught slaps your face.`,'xp+s hp-1 mp-2 flag:cg_rude']} ]);
+S_('cgV2_cellar','The Cellar Stairs','haunt|🪜 🕳️',
+`A low door under the stairs opens onto a flight of damp stone steps leading down into pure dark. A smell of salt and mud drifts up. Faint scratching echoes from below, like something small dragging something large.`,[
+ {t:`Go down with a torch.`,r:'item:cg_flashlight|item:cg_penlight',y:[`The cellar is a low stone room full of old boat-gear: nets, oars, floats. In a corner, a little boat-shaped hole in the dust where something was taken. And, on a beam, a tin with coins.`,'xp+l gold+6 mp+2 flag:cg_knows_storm']},
+ {t:`Go down in the dark, hand on the wall.`,c:'WIS 9 resist',y:[`You count the steps, feel your way and find a tin of old coins on a ledge. A faint scratching stops as you come near.`,'xp+l gold+5 mp+2'],n:[`The dark is thick. You come back up empty-handed, heart pounding.`,'xp+s mp-2']},
+ {t:`Pour a line of salt on the top step.`,r:'item:cg_salt',y:[`The scratching stops dead. A very small voice says, in disgust, "Rude." But the cellar stays quiet, and you slip down and out safely, with a handful of old coins.`,'-cg_salt xp+m gold+4 mp+1']},
+ {t:`Shut the door gently and leave it.`,y:[`Not everything in a house is for you. You close the door, softly.`,'xp+s']} ]);
+S_('cgV2_hideseek','Hide and Seek','haunt|🙈 👻',
+`A ring of laughter fills the hall, and a hundred tiny shadows appear, running between the pillars, giggling. They are the other lost children, the ones who stayed, grinning and ragged and not at all frightening. One tugs your sleeve. "You are it," she whispers. "Count to twenty."`,[
+ {t:`Count to twenty with your eyes shut, and play fair.`,y:[`One, two, three... By twenty, the hall is silent. You open your eyes, and then you search, and find eleven of them, one by one, shrieking with laughter. They stay by you after that, shyly.`,'xp+l mp+4 flag:cg_kind']},
+ {t:`Join in, but cheat by using your torch.`,r:'item:cg_flashlight|item:cg_penlight',y:[`You find nine hiding spots in two minutes. The children are outraged, then delighted. "Again!" they cry.`,'xp+m mp+3']},
+ {t:`Beat them all with clever thinking.`,c:'INT 9 lore',y:[`You work out the best hiding places and find them all in a minute. They declare you the best seeker in the house.`,'xp+l mp+3'],n:[`They are better at hiding than you are. You find three, and the rest vanish into walls.`,'xp+m mp+2']},
+ {t:`Politely decline and say you are in a hurry.`,y:[`The children sigh. "Next time," one says. "Promise?" You promise.`,'xp+s mp+1']} ]);
+S_('cgV2_madam','A Talk with Madam Soo','haunt|👻 🕯️',
+S => { const g = S.flags.cg_offering_given, r = S.flags.cg_respect; return `In the hall, the air thickens, and Madam Soo Lian steps out of the shadows, pale and straight-backed. ${r?'"You have shown courtesy."':'"You come into my house like a gust of wind."'} She studies you with eyes that are very old and very tired.${g?' "And you remembered the oranges. A small thing, and not forgotten."':''}\n"I will make you an offer," she says. "Tell me what you really want."`; },[
+ {t:`"I want to take Aiman home, and help you find peace."`,y:[`A long silence. Her face softens, as if a very old stone has cracked. "Peace," she says. "I have forgotten what it would look like. Bring me what I have lost, and I will think about it."`,'xp+l mp+4 flag:cg_trust']},
+ {t:`"What did you lose, Madam?"`,y:[`"A boat," she says, her voice breaking. "A light for her to find the way home. And a song." Her hands twist together. "That is all. That is everything."`,'xp+l mp+3 flag:cg_knows_names flag:cg_trust']},
+ {t:`Hum the lullaby.`,r:'flag:cg_lullaby',y:[`Her face crumples. "Where did you hear that?" she whispers. "No one has sung that since..." She cannot finish. A single tear shines in the lamplight.`,'xp+l mp+4 flag:cg_trust flag:cg_gate_trust']},
+ {t:`Bow and ask permission to leave.`,y:[`"Of course," she says. "Everyone leaves." She nods, and her form fades, and the hall goes quiet.`,'xp+m mp+2']} ]);
+S_('cgV2_retreat','The House Closes','beach|🌌 🕛',
+`The grandfather clock strikes twelve, and all the doors in the house swing shut at once with a soft thump. A firm, gentle wind sweeps you through the hall, down the veranda steps, along the brick path and out through the gate. You land on the sand, panting.\nBehind you, a voice sighs through the casuarinas: "Come back when you can bring me what I need."`,[
+ {t:`Tell Uncle Lim what Madam Soo said.`,y:[`"A boat, a light and a song," he repeats slowly. "I have heard that before. Find them. All three."`,'xp+l mp+4 hp+5 flag:cgv2_done tod:day']},
+ {t:`Count what you have gathered.`,y:[`Coins from the cellar, a clue about a lullaby, a little more courage. Not nothing.`,'xp+m mp+3 flag:cgv2_done tod:day']},
+ {t:`Go home and rest.`,y:[`A hot shower, a bowl of soup and a deep, dreamless sleep.`,'rest xp+m flag:cgv2_done tod:day']} ]);
+
+/* ================= HOUSE VISIT 3: UPSTAIRS ================= */
+G.chapter('cgV3',{ story:'changi', n:'Chapter 9: The Upper Floor', sub:'Stairs, nursery, attic and a sleeping boy', ch:3, region:'cg_house', art:'haunt|🪜 🌙', age:11, btn:'Climb the stairs',
+  text:`This time, the house knows you.\nThe doors open for you, the lamps light themselves, and the paper boats part like a sea. But it is a different kind of welcome. It is the welcome of someone who has made up their mind.\nUpstairs, Aiman is asleep. Upstairs, Mei is hiding. Upstairs, Madam Soo is waiting, and she is no longer sure that she wants you to leave.`,
+  beats:()=>['cgV3_intro','cg_stall_a','cg_stall_b'].concat(G.mix(['cg4_stairs','cgV3_corridor','cg4_nursery','cg4_attic','cgV3_library'],8,{nocamp:true}),['cgV3_chase','cgV3_retreat']) });
+S_('cgV3_intro','The Bottom of the Stairs','haunt|🪜 🌙',
+`The staircase rises into dark, wide and creaky. At the foot, a ring of paper boats forms a little welcome. From above comes the faint sound of a music box, and, very quiet, the sound of someone breathing in their sleep.\nYour hands are steady, but your stomach is not.`,[
+ {t:`Take a breath, and climb.`,y:[`One step. Two. The boats ripple and let you pass. The music box grows louder.`,'xp+m mp+2']},
+ {t:`Drink a Milo packet for courage first.`,r:'item:cg_milo',y:[`Cold chocolate-malt on an empty stomach. It is the best thing you have ever tasted.`,'-cg_milo xp+m mp+6']},
+ {t:`Sniff the Tiger Balm for a little more nerve.`,r:'item:cg_balm',y:[`Sharp, minty, bright. Your head clears, and your knees stop knocking.`,'-cg_balm xp+m mp+5 hp+3']},
+ {t:`Hold hands with a friend.`,r:'anyally',y:[`Two pairs of feet are better than one. "I am here," they whisper.`,'xp+m mp+4']} ]);
+S_('cgV3_corridor','The Corridor of Doors','haunt|🚪 🚪',
+`The upstairs corridor is long, with six identical doors. Each has a small brass number, and each hums slightly, as if something is behind it. From behind the third, a child\'s voice is counting. From behind the fifth, a woman is humming the lullaby. Behind the sixth, there is only silence.`,[
+ {t:`Open the third door: the counting.`,y:[`A tiny room, with a rocking horse and a little bed. Nobody there. A music box on the windowsill ticks, and a single paper boat lies in the middle of the floor. You pick it up.`,'xp+m mp+2 +cg_paperboat']},
+ {t:`Listen at the fifth door: the humming.`,c:'WIS 9 spirit',y:[`You catch the full tune, and every note. You hum it back, softly, and the humming stops, listening. Then it hums again, gently, in harmony.`,'xp+l mp+3 flag:cg_lullaby'],n:[`The humming fades before you can catch it.`,'xp+s']},
+ {t:`Open the sixth door: the silence. (Costs Courage)`,mp:3,y:[`Cold. Pitch black. A long, narrow room with an enormous bed, a woman's hairbrush on the dresser and a faded photograph. You take the photograph and back out quietly.`,'xp+l +cg_photo flag:cg_knows_time']},
+ {t:`Walk to the end of the corridor.`,y:[`At the end stands a door with a red cloth tied round the handle. It is the nursery.`,'xp+m mp+1']} ]);
+S_('cgV3_library','Aiman in the Armchair','haunt|📚 😴',
+`In the library, Aiman lies curled in a big green armchair, his jersey rumpled, a little smile on his face. A hundred paper boats float in a ring around him on a layer of silver mist. When you shake his shoulder, he mumbles and rolls over, but does not wake. When you pull the mist back, it flows in again, soft as breath.\nHe is not hurt. He is held.`,[
+ {t:`Whisper to him about football.`,y:[`His nose twitches. "Penalty..." he mumbles, smiling, and is gone again. But you can feel him almost surfacing.`,'xp+m mp+3 flag:cg_saw_aiman']},
+ {t:`Place his water bottle in his hand.`,r:'item:cg_aiman_bottle',y:[`His fingers close on it. "Cold," he whispers. "Good." But he does not wake. A little longer, you think. Be patient.`,'xp+l mp+4 flag:cg_saw_aiman']},
+ {t:`Pour a line of salt around the armchair.`,r:'item:cg_salt',y:[`The mist recoils from the salt and the paper boats freeze. A cold voice says: "NO." The room shakes. Madam Soo has noticed.`,'-cg_salt xp+m mp-3 flag:cg_saw_aiman flag:cg_angered']},
+ {t:`Sit beside him and promise to return.`,y:[`"Hang on," you whisper. "I will come back. Properly. With everything she needs."`,'xp+l mp+3 flag:cg_saw_aiman']} ]);
+S_('cgV3_chase','The House Wakes Up','haunt|🌊 🏃',
+`With a sound like a wave breaking, every door on the upper floor swings open at once. A wind howls up the staircase. The mist surges. The paper boats stream past you like a river. From somewhere very close, a voice that is the whole house says: "STAY."\nYou run.`,[
+ {t:`Sprint for the stairs, taking them three at a time.`,c:'DEX 9 dodge',y:[`You fly, skip, leap. The wind snatches at your sleeve, but you hit the hall tiles running, and keep going.`,'xp+l mp+2'],n:[`You trip on the third step, tumble down five and land in a heap. The wind drops, almost embarrassed.`,'xp+m hp-3']},
+ {t:`Hold out the peace charm and keep walking.`,r:'item:cg_charm',y:[`The little red charm glows, and the wind softens. A voice, tired, says: "Go on, then." You walk out calmly.`,'xp+l mp+3']},
+ {t:`Throw down a line of salt behind you.`,r:'item:cg_salt',y:[`The mist rolls up against the white line and stops. The wind sighs. You go on without looking back.`,'-cg_salt xp+m mp+2']},
+ {t:`Stand your ground and say: "I am coming back. Properly." (Costs Courage)`,mp:3,y:[`The wind stops dead. For a long moment, you stand in the stillness. "Very well," says a quiet, startled voice. "I shall hold you to it." The doors close. You walk out.`,'xp+l mp+3 flag:cg_respect flag:cg_trust']} ]);
+S_('cgV3_retreat','Out on the Sand','beach|🌅 🌊',
+`You stagger through the gate and onto the cold, wet sand. The tide is coming in. Behind you, the house has gone quiet. The upstairs windows glow, one by one, a very gentle yellow.\nUncle Lim is on his feet, lantern in hand. "You went upstairs," he says. "I can see it in your face." He puts his hand on your shoulder. "Now you know what you are up against. And what she is up against."`,[
+ {t:`Tell him what you found.`,y:[`"A boat for Mei," he says. "A light for Soo Lian. A song for the house. It is all the same: three things, all of them yours to find." He pours you a cup of tea.`,'xp+l mp+4 hp+6 flag:cgv3_done tod:day']},
+ {t:`Take stock of your bag.`,y:[`You are lighter in coins, heavier in memories. You know exactly what you still need.`,'xp+m mp+3 flag:cgv3_done tod:day']},
+ {t:`Go home and sleep for a whole day.`,y:[`A long, heavy sleep.`,'rest xp+m flag:cgv3_done tod:day']} ]);
+
+/* a few real risks inside the house (gentle end-of-journey outcomes, never gory) */
+G.scenes.cgV1_maze.opts.push({ t:`Ignore the boats and crash straight through the hedge.`, c:'STR 10 endure', y:[`Thorns tear your sleeves, but you burst out of the far side of the maze, scratched and triumphant.`,'xp+m hp-2'], n:[`The hedge closes behind you, thick and silent. The mist swallows every landmark. When the beach patrol finds you at dawn, you are curled asleep under a bougainvillea, perfectly unhurt, and very much finished for the night. Your adventure ends here.`,'die'] });
+G.scenes.cgV3_corridor.opts.push({ t:`Climb onto the big bed in the sixth room and rest.`, y:[`The quilt is soft, the pillow cool, a lullaby hums very far away. You close your eyes for just one minute. When the beach patrol finds you at dawn, you are curled up on the sand, fast asleep. Your adventure ends here.`,'die'] });
+G.scenes.cgV2_cellar.opts.push({ t:`Sit on the cellar steps and eat your snack.`, y:[`Something scratches the other side of the step, very politely, until you share. A small, grateful whiskery sniff, and the rest of the dark is quiet.`,'xp+s mp+1 hp+2'] });
+
+/* ================= FINAL NIGHT: shorter, and it catches up anything skipped ================= */
+const fin = G.chapters.cg4;
+fin.beats = ['cg4_beach','!flag:cgv1_done?cg4_gate','!flag:cgv2_done?cg4_veranda','!flag:cgv3_done?cg4_nursery','~enc','cg4_library','cg4_confront1','cg4_confront2'];
+
+/* ================= pacing: fewer filler encounters in the build-up chapters ================= */
+const thin = id => { const ch = G.chapters[id]; if (!ch) return; const old = ch.beats; ch.beats = S => { let k = 0; return (typeof old === 'function' ? old(S) : old.slice()).filter(b => b !== '~enc' || (k++ % 2 === 0)); }; };
+['cgA','cgB','cgC','cgD','cgE','cgF','cgH','cgI','cgG','cgJ','cg3'].forEach(thin);
+
+/* ================= chapter order: adventure, clue, adventure, clue ================= */
+G.stories.changi.chapters = ['cg1','cg2','cgV1','cgA','cgB','cgV2','cgC','cgD','cg3','cgV3','cgE','cgF','cgH','cgI','cgG','cgJ','cg4'];
+const num = { cg1:1, cg2:2, cgV1:3, cgA:4, cgB:5, cgV2:6, cgC:7, cgD:8, cg3:9, cgV3:10, cgE:11, cgF:12, cgH:13, cgI:14, cgG:15, cgJ:16, cg4:17 };
+Object.keys(num).forEach(id => { const ch = G.chapters[id]; if (ch) ch.n = ch.n.replace(/^Chapter \d+:/, 'Chapter ' + num[id] + ':'); });
+})();
+
+</script>
+<script>
+/* THE LADY OF CASUARINA HOUSE — higher stakes: Courage can freeze you at the finale, friends can panic and leave,
+   and the friends who stay can fill in for the gifts you did not manage to bring. */
+(function(){
+const G = globalThis.G;
+const S_ = (id, title, art, text, opts, extra) => G.sc(id, art, text, opts, Object.assign({ title }, extra||{}));
+const before = (chId, sceneId, beat) => { const ch = G.chapters[chId]; const old = ch.beats; ch.beats = S => { const b = typeof old === 'function' ? old(S) : old.slice(); const i = b.indexOf(sceneId); if (i >= 0) b.splice(i, 0, beat); else b.push(beat); return b; }; };
+
+/* ---------- a friend panics inside the house ---------- */
+S_('cgV2_jiahui','Jia Hui Freezes','haunt|😰 🕯️',
+`Halfway through the hall, Tan Jia Hui stops dead and grabs the banister with both hands. Her face is white. "I'm not scared," she whispers, in a very small voice. "I just... I want to go home." Paper boats rustle around her feet. Somewhere upstairs, a child laughs.\nThe loudest girl in class has gone completely quiet.`,[
+ {t:`Hold her hand and count breaths together.`,c:'CHA 8 persuade',y:[`In for four, out for four. By the tenth breath her hands stop shaking. "Okay," she says. "Okay. I'm okay." She keeps hold of your sleeve for the rest of the night.`,'xp+m mp+2 bond:cg_jiahui flag:cg_friend_jiahui'],n:[`"I can't!" she cries, and shoves past you. The front door slams, and her footsteps pound away down the brick path. She is gone, and the house seems to have noticed.`,'xp+s mp-2 drop:cg_jiahui flag:cg_jiahui_fled']},
+ {t:`Open a Milo packet and share it with her.`,r:'item:cg_milo',y:[`She drinks it in three gulps, wipes her mouth and nods. "Better," she says. "Don't tell anyone I was scared." You promise.`,'-cg_milo xp+m mp+2 bond:cg_jiahui flag:cg_friend_jiahui']},
+ {t:`Take the lead and tell her to follow you. (Costs Courage)`,mp:3,y:[`You walk ahead, shoulders back, and talk loudly about nothing. By the time you reach the dining room, she is right behind you, arguing about football. It worked.`,'xp+l bond:cg_jiahui flag:cg_friend_jiahui']},
+ {t:`Walk her back to Uncle Lim, then return alone.`,y:[`She does not argue. "Sorry," she mumbles on the beach. "Next time." Uncle Lim pours her a cup of barley water, and you head back in alone.`,'xp+s drop:cg_jiahui flag:cg_jiahui_waits']} ]);
+
+S_('cgV3_hakim','Hakim\'s Ankle','haunt|🩹 🪜',
+`On the dark landing, a rotten stair-board gives way. Hakim yelps, grabs the rail and goes down on one knee, hissing through his teeth. "Twisted it," he mutters. "Just a little." He is hopping, white-lipped, and trying very hard to look as if he is not.\nHe is the toughest friend you have. It is very odd to see him hurt.`,[
+ {t:`Bandage his ankle with plasters.`,r:'item:cg_plaster',y:[`You wrap it firmly, the way you learned in Scouts. He tests it, winces and grins. "Walkable. Thanks."`,'-cg_plaster xp+m mp+2 bond:cg_hakim']},
+ {t:`Help him along, one arm over your shoulder.`,c:'STR 8 endure',y:[`It is slow, and he is heavy, but together you manage the rest of the corridor. He grits his teeth and jokes the whole way.`,'xp+m hp-1 bond:cg_hakim'],n:[`He is heavier than he looks. Halfway down the corridor, he says quietly: "I'll slow you down. I should wait outside." You help him to the door, and he limps to the beach.`,'xp+s drop:cg_hakim flag:cg_hakim_waits']},
+ {t:`Tell him to rest on the veranda with a torch.`,y:[`"Boss," he says, saluting, with a very brave face. "I'll keep watch." You hand him the torch and promise to be quick.`,'xp+s drop:cg_hakim flag:cg_hakim_waits']} ]);
+
+S_('cgV3_priya','Priya in the Locked Room','haunt|🚪 📓',
+`A door slams somewhere behind you. "Priya?" you call. A thin, muffled voice answers from inside a small room halfway down the corridor. The door is shut, and the brass handle does not move. "I was just reading the spines of the books!" she calls, in a voice that is trying very hard to be calm. "It closed by itself. Please do something."`,[
+ {t:`Use the rusty key on the door.`,r:'item:cg_key',y:[`The key turns with a sigh. Priya bursts out, holding a book so tight that her knuckles are white. "The labels!" she gasps. "They have dates!" You grin. She is fine.`,'-cg_key xp+l mp+3 bond:cg_priya flag:cg_friend_priya']},
+ {t:`Pick the lock with a pen.`,c:'DEX 9 craft',y:[`Click! Priya bursts out, flushed. "Thank you," she says, and shows you a page: "1958. Soo family. Mei, age seven." You stare.`,'xp+l mp+2 bond:cg_priya flag:cg_knows_names'],n:[`The lock will not give. Behind you, the walls start to creak. Priya, voice shaking, says: "Get Uncle Lim. I'll wait." A long half hour later, Uncle Lim opens the door with a crowbar. Priya goes home, shaken but unhurt.`,'xp+s mp-2 drop:cg_priya flag:cg_priya_waits']},
+ {t:`Talk to her through the door and calm her down.`,c:'CHA 8 persuade',y:[`You talk about the maths test, her cat, anything. The handle clicks softly. "It opened by itself," she whispers, stepping out. "When I stopped being scared."`,'xp+l mp+3 bond:cg_priya flag:cg_friend_priya'],n:[`She talks back, but her voice grows more fragile. In the end, she asks, very small: "Can I go home now?" Uncle Lim lets her out, and takes her home.`,'xp+s drop:cg_priya flag:cg_priya_waits']},
+ {t:`Run for Uncle Lim.`,y:[`Uncle Lim comes with a crowbar and a lantern. The door opens, and Priya is out, pale and furious at the house. "I am going home," she says firmly. "I will help from there."`,'xp+s drop:cg_priya flag:cg_priya_waits']} ]);
+
+before('cgV2','cgV2_retreat','ally:cg_jiahui?cgV2_jiahui');
+before('cgV3','cgV3_chase','ally:cg_hakim?cgV3_hakim');
+before('cgV3','cgV3_chase','ally:cg_priya?cgV3_priya');
+
+/* ---------- the finale: Courage decides whether you can stand ---------- */
+const c1 = G.scenes.cg4_confront1;
+c1.text = c1.text + `\nThis is the moment everything has led to. Your knees feel like water. Whatever you have left in you, now is the time to find it.`;
+c1.opts = [
+ {t:`Plant your feet and stand your ground. (Costs Courage)`,mp:4,y:[`You plant your feet, hold your breath and lift your chin. The wind pushes at your hair but does not push you. You are scared, and you stand anyway. The house shivers, uncertain.`,'xp+l flag:cg_stood']},
+ {t:`Sniff the Tiger Balm for courage.`,r:'item:cg_balm',y:[`Sharp, minty, bright. Your head clears and your knees stop knocking. You stand up straighter.`,'-cg_balm xp+m mp+5 flag:cg_stood']},
+ {t:`Open a Milo packet and drink it down.`,r:'item:cg_milo',y:[`Cold, sweet, chocolatey. It tastes like every Saturday morning. Your hands steady.`,'-cg_milo xp+m mp+6 flag:cg_stood']},
+ {t:`Take a friend's hand.`,r:'anyally',y:[`A warm, sweaty, very real hand. "I'm here," says your friend. "I'm not scared." Their voice shakes. It does not matter.`,'xp+m mp+4 flag:cg_stood']},
+ {t:`Back up against the wall and close your eyes.`,y:[`You squeeze your eyes shut and press your back to the wall. The wind rises, and a cold, soft voice murmurs: "Shh... sleep..." Your legs will not move. Your voice will not come.`,'xp+s mp-2 flag:cg_froze']} ];
+
+S_('cg4_froze','Frozen','bungalow|🥶 🌊',
+`The mist climbs the stairs, soft and cold as a sheet. Madam Soo's voice sinks into your ears like warm water: "Rest, little one. Everyone rests, in the end." Your legs are heavy, your tongue is thick and the whole room feels very far away. Aiman, behind you, is still asleep.\nYou cannot fight her like this. You need to find your courage, quickly, or you will not be leaving.`,[
+ {t:`Gulp down a Milo packet.`,r:'item:cg_milo',y:[`Chocolate, malt, sugar. The fog in your head clears a little. You straighten, and look at the lady.`,'-cg_milo xp+m mp+6 flag:cg_stood']},
+ {t:`Sniff the Tiger Balm, hard.`,r:'item:cg_balm',y:[`It stings your nose and your eyes, and wakes you up like a slap. You stand.`,'-cg_balm xp+m mp+5 flag:cg_stood']},
+ {t:`Reach for a friend's hand.`,r:'anyally',y:[`A warm, real hand. It pulls you back from the edge. "Come on," says your friend. "Get up." You get up.`,'xp+m mp+4 flag:cg_stood']},
+ {t:`Hum the lullaby.`,r:'flag:cg_lullaby',y:[`The tune comes up from a place the cold cannot reach. The mist wavers. You find your feet, and your voice.`,'xp+m mp+3 flag:cg_stood']},
+ {t:`Stumble out of the house while you still can.`,y:[`Hand over hand along the wall, you reach the door and tumble out onto the sand. Behind you, the house sighs, a long, sad sigh. You have failed, this time. But you are safe, and Aiman is still inside.`,'xp+s >cg_end_c']},
+ {t:`Close your eyes and let the mist take you.`,y:[`It is so soft. It is so warm. Nobody is shouting. You sink into the mist like a stone into a pond.`,'xp+s >cg_end_sleep']} ]);
+G.chapters.cg4.beats = ['cg4_beach','!flag:cgv1_done?cg4_gate','!flag:cgv2_done?cg4_veranda','!flag:cgv3_done?cg4_nursery','~enc','cg4_library','cg4_confront1','flag:cg_froze&!flag:cg_stood?cg4_froze','cg4_confront2'];
+
+/* ---------- the finale: friends can fill in for what you could not bring ---------- */
+const c2 = G.scenes.cg4_confront2.opts;
+const at = c2.length - 1;   // keep the plain "walk out" option last
+c2.splice(at, 0,
+ {t:`Priya holds up her careful drawing of Mei's red boat.`,hide:true,r:'ally:cg_priya&!flag:cg_gave_boat&!item:cg_boat&!item:cg_replica',y:[`Priya steps forward with her notebook open. "I couldn't find the real one," she says, shaking, "but this is exactly what it looked like." Madam Soo takes the drawing as if it were made of glass. "Yes," she whispers. "Red. With a white stripe." She holds it to her heart.`,'xp+l mp+3 bond:cg_priya flag:cg_gave_boat stayc']},
+ {t:`Hakim holds up his big football torch at the window.`,hide:true,r:'ally:cg_hakim&!flag:cg_gave_lantern&!item:cg_lantern',y:[`Hakim jams his torch against the glass and switches it on. A great white beam pours out over the dark sea, bright as a lighthouse. "Like that?" he says. Madam Soo's face lifts. "A light," she whispers. "Someone is still looking for her."`,'xp+l mp+3 bond:cg_hakim flag:cg_gave_lantern stayc']},
+ {t:`Jia Hui sings the lullaby beside you, loudly and a little off-key.`,hide:true,r:'ally:cg_jiahui&!flag:cg_sang',y:[`She has never sung in public, and her voice wobbles on every note. But she keeps going, loudly, defiantly. "My grandmother sang this one!" she says. By the second verse Madam Soo is humming with her, and so, tiny and clear, is someone upstairs.`,'xp+l mp+3 bond:cg_jiahui flag:cg_sang stayc']});
 })();
 
 </script>

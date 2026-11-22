@@ -4,7 +4,7 @@ const G = globalThis.G;
 const S_ = (id, title, art, text, opts, extra) => G.sc(id, art, text, opts, Object.assign({ title }, extra||{}));
 const VISITED = ['cg_v_orchard','cg_v_chinatown','cg_v_littleindia','cg_v_glam','cg_v_hawpar','cg_v_sentosa','cg_v_marina','cg_v_jewel'];
 
-G.chapter('cg3',{ story:'changi', n:'Chapter 3: Across Singapore', sub:'The school holidays · five days to find something that helps', ch:3, region:'cg_city', art:'skyline|🚇 🌆', age:11, btn:'Start planning',
+G.chapter('cg3',{ story:'changi', n:'Chapter 3: Across Singapore', sub:'The school holidays · three days to find something that helps', ch:3, region:'cg_city', art:'skyline|🚇 🌆', age:11, btn:'Start planning',
   text:`School holidays have begun. You have three days before the fifteenth night of the seventh month, when the house will be at its strongest.\nSingapore is small enough to cross in an hour or two, and the MRT can take you almost anywhere: Orchard Road's shops, Chinatown's temples, Little India's late-night stores, the old Malay quarter of Kampong Glam, the stone dragons of Haw Par Villa, the beaches of Sentosa, the glittering Marina Bay, and the airport's glass garden at Jewel.\nYou cannot visit everywhere. Choose the three places you think will help the most.`,
   beats:['cg3_plan','~enc','cg3_hub','~enc','cg3_eve1','cg3_hub','cg3_eve2','~enc','cg3_hub','cg3_prep'] });
 
