@@ -180,7 +180,7 @@ function renderScreen(sc, opts){
     if (o.mp) meta.push(`<span class="m mp">✦ −${o.mp} ${esc(mpL())}</span>`);
     const rl = reqLabel(o); if (rl) meta.push(`<span class="m">${esc(rl)}</span>`);
     if (o.safe && !o.chk && !rl) meta.push('');
-    oh += `<button class="opt" data-i="${i}"><span class="key">${i+1}</span><span class="lbl">${o.html||esc(o.label)}</span><span class="meta">${meta.join('')}</span></button>`; });
+    oh += `<button class="opt" data-i="${i}"><span class="key">${o.zero?'0':i+1}</span><span class="lbl">${o.html||esc(o.label)}</span><span class="meta">${meta.join('')}</span></button>`; });
   lk.forEach(o => { oh += `<div class="opt locked" title="${esc(o.why||'')}"><span class="key">🔒</span><span class="lbl">${esc(o.label)}</span><span class="meta"><span class="m">${esc(o.why||'Locked')}</span></span></div>`; });
   $('#opts').innerHTML = oh + `<div class="hint"><span class="kbhint">Press a number key (numpad works) · <b>Space</b> skip voice · <b>R</b> re-read · <b>M</b> mute · <b>U</b> use item · <b>L/H/P/T</b> panels · <b>Esc</b> menu</span><span class="tchint">Tap a choice · ☰ Menu: voice &amp; settings · 📋 Panels: your choices, hero and pack</span></div>`;
   $('#opts').querySelectorAll('button.opt').forEach(b => b.onclick = () => pickIndex(+b.dataset.i));
@@ -232,6 +232,7 @@ document.addEventListener('keydown', e => {
   if (tgt==='INPUT' || tgt==='SELECT' || tgt==='TEXTAREA'){ if (e.key==='Enter' && e.target.id==='nameIn') { e.preventDefault(); nameDone(); } return; }
   if (e.ctrlKey||e.metaKey||e.altKey) return;
   let n = null;
+  if ((e.code==='Digit0' || e.code==='Numpad0') && mode==='title' && !modalOpen && CUR){ const z = CUR.opts.find(o=>o.zero); if (z && z.fn){ e.preventDefault(); z.fn(); return; } }
   if (/^Numpad[1-9]$/.test(e.code)) n = +e.code.slice(6); else if (/^Digit[1-9]$/.test(e.code)) n = +e.code.slice(5);
   if (n){ e.preventDefault(); if (modalOpen==='use'){ useByNumber(n-1); return; } if (modalOpen) return; pickIndex(n-1); return; }
   const k = e.key.toLowerCase();
@@ -311,7 +312,7 @@ function toTitle(){
   setArt('title|📖 ✨', 'library', 'Choose your story', '');
   const opts = storyIds().map(id => { const st=G.stories[id]; const saved=!!LS.get(sk('aq_save',id));
     return mk('', ()=>storyMenu(id), { html:`<b>${st.icon} ${esc(st.title)}</b>${saved?' <span class="m safe">saved game</span>':''}<span class="sub">${esc(st.tag)}</span><span class="sub2">${esc(st.desc)}</span>` }); });
-  opts.push(mk('Voice & narration settings', openSettings));
+  opts.push(mk('Voice & narration settings', openSettings, { zero:true }));
   renderScreen({ art:'title|📖', title:'Build Your Own Adventure Story Building', card:true, opts, wxline:false, text:
     'BYOA by Jaken\nWELCOME, STORYTELLER\nPick an adventure. Every story has its own hero, places, items, dangers and endings, and every choice you make is recorded as you go.\nChoose with the number keys.' }, { silent:false });
   renderRight();
