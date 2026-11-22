@@ -8952,7 +8952,7 @@ function runUnits(units){
   stopSpeech(); if (!SP.on || !synth || !units.length) return;
   const gen = ++SP.gen; SP.units = units; SP.speaking = true; updateVoiceBtns(); let started = false;
   const v = chooseVoice();
-  const next = i => {
+  const next = (i, retry) => {
     if (gen !== SP.gen) return;
     if (i >= units.length){ SP.speaking=false; updateVoiceBtns(); return; }
     const u = units[i]; const txt = clean(u.text);
@@ -8961,10 +8961,14 @@ function runUnits(units){
     ut.onstart = () => { started = true; if (gen!==SP.gen) return; document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); if (u.el){ u.el.classList.add('speaking'); try{ u.el.scrollIntoView({block:'nearest'}); }catch(e){} } };
     ut.onend = () => { if (gen!==SP.gen) return; if (u.el) u.el.classList.remove('speaking'); next(i+1); };
     ut.onerror = () => { if (gen!==SP.gen) return; next(i+1); };
-    if (i===0){ setTimeout(()=>{ if (gen===SP.gen && !started){ SP.speaking=false; updateVoiceBtns(); } }, 3500); }
+    if (i===0){ setTimeout(()=>{ if (gen!==SP.gen || started) return;
+      if (!retry){ try{ synth.cancel(); }catch(e){} setTimeout(()=>{ if (gen===SP.gen && !started) next(0, true); }, 60); }   /* some browsers drop the first utterance: try once more */
+      else { SP.speaking=false; updateVoiceBtns(); } }, retry ? 3500 : 1800); }
+    try{ synth.resume(); }catch(e){}
     synth.speak(ut);
   };
-  setTimeout(()=>next(0), 80);
+  /* start straight away (inside the player's click or key press, which Safari and phones require) unless a cancel is still settling */
+  if (synth.speaking || synth.pending) setTimeout(()=>next(0), 80); else next(0);
 }
 function updateVoiceBtns(){
   const b = $('#bVoice'); if (b){ b.classList.toggle('on', SP.on); b.textContent = SP.on ? (SP.speaking?'🔊 Reading…':'🔊 Voice') : '🔇 Muted'; }
@@ -9307,7 +9311,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', e => { if (e.key==='Escape') closePanel(); });
   /* mobile browsers only allow speech after a tap: unlock it with a silent utterance on the first touch / click */
   const unlock = () => { if (!synth) return; try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); }catch(e){} if (SP.on && SP.pending && mode==='play') setTimeout(()=>runUnits(SP.pending), 200); };
-  ['touchend','click'].forEach(ev => document.addEventListener(ev, unlock, { once:true, passive:true }));
+  ['touchend','click','keydown'].forEach(ev => document.addEventListener(ev, unlock, { once:true, passive:true }));
   G.narrOn = LS.get('aq_rich') !== '0';
   updateVoiceBtns(); toTitle();
 });
