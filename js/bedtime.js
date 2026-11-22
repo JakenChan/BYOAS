@@ -1,11 +1,11 @@
 /* BEDTIME PLAYER: a long, slow, voiced story with a handful of gentle forks.
    No stats, no skills, no danger. The story keeps itself going: each chunk is read aloud, then the next one begins.
-   At a fork the listener can choose with a key or a tap; if nothing happens for a minute the dice choose. */
+   At a fork the listener can choose with a key or a tap; if nothing happens for ten seconds the dice choose. */
 (function(){
 const G = globalThis.G;
 const B = G.bed = {};
 const NODES = {}, DEF = {};
-const ASK_WAIT = 60;                 /* seconds before the dice decide */
+const ASK_WAIT = 10;                 /* seconds before the dice decide */
 const FAST = Math.max(1, +(new URLSearchParams(location.search).get('bedfast') || 1));   /* test hook: ?bedfast=40 runs the timers 40 times faster */
 
 /* register a bedtime story: meta for the library + a map of nodes */
