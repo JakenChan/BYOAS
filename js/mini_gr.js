@@ -102,7 +102,7 @@ const Q = [
 ];
 const FR = [['An old scholar in the agora stops you.','🧓'],['A priestess tests you at a wayside shrine.','🔮'],['A sailor on the jetty grins at you.','⚓'],['A boy selling olives asks you a riddle.','🫒'],['A curious traveller on the road asks you a question.','🧭'],['An owl on a column hoots, and a voice in your head asks.','🦉'],['A potter pauses at his wheel and asks.','🏺']];
 const trivia = Q.map((q,i)=>{ const [qq,right,w1,w2,fact]=q; const fr=FR[i%FR.length]; const rot=i%3; const arr=[[right,true],[w1,false],[w2,false]]; const ord=[0,1,2].map(k=>arr[(k+rot)%3]);
-  const opts = ord.map(([t,ok])=> ok ? o(t, `Correct! ${fact}`, i%4===0?'xp+m mp+1 gold+4':'xp+m mp+1') : o(t, `Not quite. The answer is "${right}". ${fact}`, 'mp-1 xp+s'));
+  const opts = ord.map(([t,ok])=> ok ? o(t, `Correct! ${fact}`, 'xp+m mp+1 quiz+') : o(t, `Not quite. The answer is "${right}". ${fact}`, 'xp+s quiz-'));
   return ['any','A Question for You',fr[1],`${fr[0]} "${qq}"`, opts]; });
 G.miniArch('gr_trivia', trivia);
 
@@ -256,9 +256,9 @@ L('gr_forge','The Cyclopes\' Anvil','🔨',`Three huge, one-eyed Cyclopes, Hepha
  c('Offer to hold the bar with tongs.','STR 10 endure','You grip it hard, shoulders burning. The Cyclops nods respectfully.','xp+l mp+3 hp-2','The bar is heavy. A Cyclops takes it back with gentle amusement.','xp+s hp-2'),
  o('Applaud when they are done.','Thunderous applause from one human. They seem touched.','xp+m mp+2')),
 L('gr_forge','A Smith\'s Riddle','🧩',`A young apprentice with a soot-black face sets a riddle: "I have a mouth but never speak. I have a bed but never sleep. I run but have no legs. What am I?"`,
- o('"A river."','"Correct!" he grins. "Mouth, bed and running. Everyone gets it eventually." He gives you a handful of figs.','xp+m +gr_figs mp+2'),
- o('"A furnace."','"Close, but it does not run," he says kindly. "Think wetter."','xp+s mp+1'),
- o('"A secret."','"Hm," he says. "Secrets don\'t have beds." He still laughs.','xp+s mp+1')),
+ o('"A river."','"Correct!" he grins. "Mouth, bed and running. Everyone gets it eventually." He gives you a handful of figs.','xp+m +gr_figs mp+2 quiz+'),
+ o('"A furnace."','"Close, but it does not run," he says kindly. "Think wetter."','xp+s quiz-'),
+ o('"A secret."','"Hm," he says. "Secrets don\'t have beds." He still laughs.','xp+s quiz-')),
 // --- Hades
 L('gr_hades','The Asphodel Fields','🌾',`Grey flowers sway under a grey sky. Pale shapes drift among them, the spirits of ordinary people: farmers, bakers, midwives. They are quiet, not unhappy, only faded.`,
  o('Walk quietly among them.','Nobody speaks to you, but several turn their heads as you pass. You nod politely at each one.','xp+m mp+2'),

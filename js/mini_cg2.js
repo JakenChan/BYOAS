@@ -414,7 +414,7 @@ const TR = [
 ];
 // convert trivia into mini entries (rotate answers so the right one is not always first)
 const trivia = TR.map((t,i) => { const [f,q,a,fact] = t; const order=[0,1,2]; const rot=i%3; const o = order.map((_,k)=>(k+rot)%3);
-  const opts = o.map(idx => idx===0 ? [a[0],'',`Correct! ${fact}`,`xp+m mp+1`] : [a[idx],'',`Not quite. The answer is "${a[0]}". ${fact}`,`xp+s`]);
+  const opts = o.map(idx => idx===0 ? [a[0],'',`Correct! ${fact}`,`xp+m mp+1 quiz+`] : [a[idx],'',`Not quite. The answer is "${a[0]}". ${fact}`,`xp+s quiz-`]);
   return [f, 'Singapore Quiz', '❓', q, opts]; });
 G.miniArch('cg_trivia', trivia);
 

@@ -88,6 +88,7 @@ function atom(S, parts){
     case 'time': return ({dawn:0,day:1,dusk:2,night:3})[v] === S.tod;
     case 'wx': return S.wx === v;
     case 'status': return (S.status[v]||0) > 0;
+    case 'insight': return (S.insight||0) > 0;
     case 'cp': return !!S.cp;
     case 'stat': return S.stats[v] >= +parts[2];
     case 'sv': return !!S.sv[v];
@@ -341,6 +342,27 @@ function applyFx(S, fx, R, o){
     else if (tok.startsWith('age:')) S.age = +tok.slice(4);
     else if (/^day\+\d+$/.test(tok)) S.day += +tok.slice(4);
     else if (tok.startsWith('end:')) R.ending = tok.slice(4);
+    else if ((m = /^r(\d+):(.+)$/.exec(tok))){ if (rnd(S)*100 < +m[1]) applyFx(S, m[2].split('&').join(' '), R, o); }
+    else if ((m = /^insight:(\d+)$/.exec(tok))){ S.insight = Math.max(S.insight||0, +m[1]); R.tags.push({k:'note',t:'💡 Insight for '+m[1]+' choices'}); }
+    else if (tok==='loseitem'){
+      const ids = Object.keys(S.items).filter(i => S.items[i]>0 && G.items[i] && !G.items[i].relic && G.items[i].type!=='relic');
+      if (ids.length){ const id = ids[Math.floor(rnd(S)*ids.length)]; delItem(S, id, 1, R); R.text += ' (You lost your ' + G.items[id].n + '.)'; } else R.text += ' (Luckily, there was nothing they could take.)';
+    }
+    else if (tok==='forget'){
+      const C = G.classes[S.cls]; const ids = S.skills.filter(k => k !== (C && C.sig));
+      if (ids.length){ const id = ids[Math.floor(rnd(S)*ids.length)]; S.skills.splice(S.skills.indexOf(id), 1); R.tags.push({k:'note',t:'Forgot: '+G.skills[id].n}); R.text += ' (You can no longer do what ' + G.skills[id].n + ' let you do.)'; }
+    }
+    else if (tok==='quiz+'){
+      S.qs = (S.qs||0) + 1; let note = '';
+      if (S.qs % 2 === 0){ S.insight = Math.max(S.insight||0, 3); R.tags.push({k:'note',t:'💡 Insight for 3 choices'}); note = ' Your mind is sharp now: a streak of ' + S.qs + ' correct answers brings Insight for your next few choices.'; }
+      else if (rnd(S) < 0.35){ const g = S.story==='ashen' ? amt(S,'gold','s') : 3; S.gold += g; R.tags.push({k:'gold',v:g}); note = ' A small reward for a sharp mind.'; }
+      R.text += note;
+    }
+    else if (tok==='quiz-'){
+      S.qs = 0;
+      if (rnd(S) < 0.5){ const pen = ['hp-2','mp-3', S.story==='ashen' ? 'gold-s' : 'gold-3'][Math.floor(rnd(S)*3)]; applyFx(S, pen, R, o); R.text += ' That slip cost you.'; }
+      else R.text += ' No harm done, this time.';
+    }
     else throw new Error('unknown fx token: '+tok);
   }
 }
@@ -382,7 +404,7 @@ const isSafe = raw => {
   if (raw.safe === true) return true;
   if (raw.r || raw.mp || raw.act) return false;
   let worst = 0, die = false;
-  for (const br of [raw.y, raw.n]){
+  for (const br of [raw.y, raw.n, raw.risk ? ['', raw.risk[2]] : null]){
     if (!br) continue; const fx = Array.isArray(br) ? br[1] : '';
     for (const tok of (fx||'').split(/\s+/)){
       if (tok==='die') die = true;
@@ -430,6 +452,7 @@ function runOpt(S, o, R){
     if (ck.ok){ runBranch(S, raw.y, R); if (ck.nat===20){ R.text += ' ★ A critical triumph!'; applyFx(S,'xp+s',R,{}); } }
     else { runBranch(S, raw.n || ['Things go badly.','hp-s'], R); if (ck.nat===1){ R.text += ' ☠ A disastrous fumble!'; if(!o.safe) applyFx(S,'hp-1',R,{}); } }
   } else runBranch(S, raw.y, R);
+  if (raw.risk && !R.die && !S.battle){ const rk = raw.risk; if (rnd(S)*100 < rk[0]){ R.text += ' ' + fmt(S, rk[1]); R.risked = true; applyFx(S, rk[2], R, {}); } }
   if (raw.f) raw.f(S, R); // optional JS hook
 }
 function normOpt(S, raw){
@@ -461,6 +484,8 @@ G.resolveCur = function(S){
   throw new Error('bad cur '+JSON.stringify(c));
 };
 function finish(S, sc){
+  if (S.intro && (sc.kind==='static' || sc.kind==='gen') && !sc.end && G.chapters[S.intro]){ const ch = G.chapters[S.intro];
+    sc.text = fmt(S, (ch.sub ? '«'+ch.sub+'»\n' : '') + ch.text) + '\n' + sc.text; sc.introTitle = ch.n; }
   if (!sc.opts.some(o=>o.avail)) sc.opts.push({ raw:{y:['','']}, label:'Press on', avail:true, safe:true, req:null });
   for (const o of sc.opts){ if (!o.hide || o.avail) continue; o.gone = true; }
   sc.opts = sc.opts.filter(o=>!o.gone);
@@ -514,7 +539,7 @@ G.nextBeat = function(S){
     const q = b.indexOf('?'); if (q > 0 && !/^[~#@]/.test(b)){ if (!G.req(S, b.slice(0,q)).ok) continue; b = b.slice(q+1); }
     if (b.startsWith('~talk:')){ const pp = b.split(':'); S.cur = {kind:'gen', a:'ally_talk', p:{a:pp[1], t:+pp[2], s:S.choices+7}}; S.sv={}; return; }
     if (b[0]==='#'){ // chapter card
-      const id = b.slice(6); S.cur = {kind:'card', id}; S.sv = {}; S.cp = snapshot(S, true); return;
+      const id = b.slice(6); S.intro = id; S.sv = {}; S.cur = {kind:'resume'}; S.cp = snapshot(S, true); continue;
     }
     if (b[0]==='@'){ const R={text:'',tags:[]}; applyFx(S, b.slice(1), R, {}); continue; }
     if (b==='!gate'){
@@ -536,7 +561,7 @@ G.nextBeat = function(S){
 
 /* ---------------- player choice ---------------- */
 G.choose = function(S, idx){
-  const sc = G.resolveCur(S);
+  const sc = G.resolveCur(S); S.intro = null;
   const av = sc.opts.filter(o=>o.avail); const o = av[idx]; if (!o) return null;
   if (o.act) return { act:o.act };
   const R = { text:'', tags:[], roll:null, ok:true };
@@ -547,6 +572,7 @@ G.choose = function(S, idx){
   if (!S.battle || sc.kind!=='battle') checkDeath(S, R, mercy);
   let counted = sc.count && (!R.stay || R.countStay);
   if (counted) S.choices++;
+  if (counted && S.insight > 0) S.insight--;
   S.out = { n: S.choices, chosen: o.label, text: R.text, tags: R.tags, roll: R.roll, ok: R.ok, lines: R.lines };
   S.log.push({ n: counted?S.choices:0, sc: sc.title, c: o.label, t: R.text.length>260?R.text.slice(0,257)+'…':R.text, tags: R.tags.slice(0,10), roll: R.roll?{r:R.roll.r,tot:R.roll.total,dc:R.roll.dc,s:R.roll.stat,ok:R.roll.ok}:null, ok:R.ok });
   if (R.die){ S.dead = true; S.deathText = (R.deathText || R.text) + (R.hpDeath ? ' ' + G.deathLine(S) : ''); S.cur = {kind:'death'}; S.battle = null; return { dead:true }; }
@@ -781,7 +807,7 @@ G.useItem = function(S, id){
 /* ---------------- save / load ---------------- */
 function snapshot(S, noCp){ const c = Object.assign({}, S); delete c.cp; delete c.out; return JSON.stringify(c); }
 G.snapshot = snapshot;
-G.restore = function(json){ const S = JSON.parse(json); S.story = S.story||'ashen'; G.curStory = S.story; S.cp = null; S.out = null; S.dead = false; return S; };
-G.restoreCp = function(S){ const R = JSON.parse(S.cp); R.story = R.story||'ashen'; G.curStory = R.story; R.cp = S.cp; R.out = null; R.dead=false; R.battle=null; return R; };
+G.restore = function(json){ const S = JSON.parse(json); S.story = S.story||'ashen'; G.curStory = S.story; S.cp = null; S.out = null; S.dead = false; if (S.cur && S.cur.kind==='resume') G.nextBeat(S); return S; };
+G.restoreCp = function(S){ const R = JSON.parse(S.cp); R.story = R.story||'ashen'; G.curStory = R.story; R.cp = S.cp; R.out = null; R.dead=false; R.battle=null; if (R.cur && R.cur.kind==='resume') G.nextBeat(R); return R; };
 
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -98,11 +98,13 @@ A('riddle',{
     for (let k=0;k<20 && wrong.length<2;k++){ const w=RID[Math.floor(r()*RID.length)][1]; if (w!==q[1] && !wrong.includes(w)) wrong.push(w); }
     const answers = [q[1]].concat(wrong); for (let i=answers.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [answers[i],answers[j]]=[answers[j],answers[i]]; }
     const opts = answers.map(a => a===q[1] ?
-      { t:`"${a}."`, y:[`"Correct," comes the answer, and the way opens. A small gift is left for you.`,'xp+l loot'] } :
-      { t:`"${a}."`, y:[`A cold, patient silence. "Wrong." The consequences are immediate.`, dang?'hp-l':'hp-m'] });
-    opts.push({ t:`Reason it out with old lore`, r:'skill:lore|skill:detect|item:scholars_spectacles', c:'INT 11 lore', y:[`You turn the words in your mind until the answer clicks into place: "${q[1]}." The way opens.`,'xp+l loot'], n:[`The answer slips away. Wrong, and punished for it.`,'hp-s'] });
+      { t:`"${a}."`, y:[`"Correct," comes the answer, and the way opens. A small gift is left for you.`,'xp+l loot quiz+'] } :
+      { t:`"${a}."`, y:[`A cold, patient silence. "Wrong."`, 'xp+s quiz-'] });
+    opts.push({ t:`Reason it out with old lore`, r:'skill:lore|skill:detect|item:scholars_spectacles', c:'INT 11 lore', y:[`You turn the words in your mind until the answer clicks into place: "${q[1]}." The way opens.`,'xp+l loot quiz+'], n:[`The answer slips away. Wrong, this time.`,'xp+s quiz-'] });
     opts.push({ t:`Admit you don't know and walk away`, y:[`"Honest," it says, and grudgingly lets you turn aside.`,''], k:1 });
-    return { art:`${R.biomes[0]}|🧩`, title:'A Riddle in the Road', text:`${asker} "${q[0]}"`, opts };
+    let rtext = `${asker} "${q[0]}"`;
+    if ((S.insight||0) > 0){ const wi = opts.findIndex(o=>o.y && /quiz-/.test(o.y[1]) && !o.c); if (wi >= 0){ opts.splice(wi,1); rtext += '\n💡 Insight: your sharp mind rules out one answer.'; } }
+    return { art:`${R.biomes[0]}|🧩`, title:'A Riddle in the Road', text:rtext, opts };
   } });
 
 /* ---------- TREASURE ---------- */
@@ -221,8 +223,12 @@ G.miniArch = function(name, pool){
     make(S,p){
       const R=reg(S), e=pool[p.i], r=G.lr(p.s);
       const art = e[2].includes('|') ? e[2] : `${pk(r,R.biomes)}|${e[2]}`;
-      const opts = e[4].map(a => { const o = { t:a[0] }; if (a[1]) { o.c=a[1]; o.y=[a[2],a[3]||'']; o.n=[a[4]===undefined?'It goes poorly.':a[4], a[5]||'']; } else o.y=[a[2],a[3]||'']; if (a[6]) o.r=a[6]; if (a[7]) o.mp=a[7]; return o; });
-      return { art, title:e[1], text:e[3], opts };
+      const opts = e[4].map(a => { const o = { t:a[0] }; if (a[1]) { o.c=a[1]; o.y=[a[2],a[3]||'']; o.n=[a[4]===undefined?'It goes poorly.':a[4], a[5]||'']; } else o.y=[a[2],a[3]||'']; if (a[6]) o.r=a[6]; if (a[7]) o.mp=a[7]; if (a[8]) o.risk=a[8]; return o; });
+      let text = e[3];
+      /* a sharp mind (Insight) rules out one wrong answer in a quiz */
+      if ((S.insight||0) > 0 && opts.length > 2 && opts.some(o=>/(^| )quiz\+/.test((o.y&&o.y[1])||''))){
+        const wi = opts.findIndex(o=>/(^| )quiz-/.test((o.y&&o.y[1])||'')); if (wi >= 0){ opts.splice(wi,1); text += '\n💡 Insight: your sharp mind rules out one answer.'; } }
+      return { art, title:e[1], text, opts };
     } });
 };
 })();

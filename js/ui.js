@@ -119,7 +119,7 @@ function setHeader(){
   $('#mpbar').style.width = Math.max(0,S.mp/S.maxMp*100)+'%'; $('#mptxt').textContent = `${mpL()} ${S.mp} / ${S.maxMp}`;
   $('#xpbar').style.width = (S.lvl>=20?100:S.xp/G.xpNeed(S.lvl)*100)+'%'; $('#xptxt').textContent = `Lv ${S.lvl}  ·  XP ${S.lvl>=20?'MAX':S.xp+'/'+G.xpNeed(S.lvl)}`;
   const st = Object.keys(S.status).filter(k=>S.status[k]>0).map(k=>({poison:'☠',bless:'✨',curse:'💀'})[k]).join('');
-  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${C.n}</span><span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span><span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>${st?`<span class="chip">${st}</span>`:''}`;
+  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${C.n}</span><span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span><span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>${st?`<span class="chip">${st}</span>`:''}${S.insight>0?`<span class="chip" title="A sharp mind: one wrong answer is ruled out in the next question">💡 Insight <b>${S.insight}</b></span>`:''}`;
 }
 function renderRight(){
   const R = $('#rbody'); if (!R) return;
@@ -177,7 +177,7 @@ function renderScreen(sc, opts){
   const av = sc.opts.filter(o=>o.avail), lk = sc.opts.filter(o=>!o.avail);
   let oh = '';
   av.forEach((o,i) => { const meta = [];
-    if (o.mp) meta.push(`<span class="m mp">✦ −${o.mp} MP</span>`);
+    if (o.mp) meta.push(`<span class="m mp">✦ −${o.mp} ${esc(mpL())}</span>`);
     const rl = reqLabel(o); if (rl) meta.push(`<span class="m">${esc(rl)}</span>`);
     if (o.safe && !o.chk && !rl) meta.push('');
     oh += `<button class="opt" data-i="${i}"><span class="key">${i+1}</span><span class="lbl">${o.html||esc(o.label)}</span><span class="meta">${meta.join('')}</span></button>`; });

@@ -6,7 +6,7 @@ const S_ = (id, title, art, text, opts, extra) => G.sc(id, art, text, opts, Obje
 const QS = (id, title, art, text, ans, msgs, fx) => {
   const arr = [{t:ans[0],ok:1},{t:ans[1],w:1},{t:ans[2],w:2}]; const rot = (id.length*7 + id.charCodeAt(id.length-1)) % 3;
   const ord = [0,1,2].map(k => arr[(k+rot)%3]);
-  S_(id, title, art, text, ord.map(e => e.ok ? {t:e.t, y:[msgs[0], fx||'xp+l mp+2']} : {t:e.t, hide:true, r:'!sv:w'+e.w, y:[msgs[e.w], 'mp-1 xp+s svflag:w'+e.w+' stayc']}));
+  S_(id, title, art, text, ord.map(e => e.ok ? {t:e.t, y:[msgs[0], (fx||'xp+l mp+2')+' quiz+']} : {t:e.t, hide:true, r: e.w===1 ? '!sv:w1&!insight' : '!sv:w2', y:[msgs[e.w], 'xp+s quiz- svflag:w'+e.w+' stayc']}));
 };
 G.grh = { S_, QS };
 

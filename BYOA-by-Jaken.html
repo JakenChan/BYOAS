@@ -326,6 +326,7 @@ function atom(S, parts){
     case 'time': return ({dawn:0,day:1,dusk:2,night:3})[v] === S.tod;
     case 'wx': return S.wx === v;
     case 'status': return (S.status[v]||0) > 0;
+    case 'insight': return (S.insight||0) > 0;
     case 'cp': return !!S.cp;
     case 'stat': return S.stats[v] >= +parts[2];
     case 'sv': return !!S.sv[v];
@@ -579,6 +580,27 @@ function applyFx(S, fx, R, o){
     else if (tok.startsWith('age:')) S.age = +tok.slice(4);
     else if (/^day\+\d+$/.test(tok)) S.day += +tok.slice(4);
     else if (tok.startsWith('end:')) R.ending = tok.slice(4);
+    else if ((m = /^r(\d+):(.+)$/.exec(tok))){ if (rnd(S)*100 < +m[1]) applyFx(S, m[2].split('&').join(' '), R, o); }
+    else if ((m = /^insight:(\d+)$/.exec(tok))){ S.insight = Math.max(S.insight||0, +m[1]); R.tags.push({k:'note',t:'💡 Insight for '+m[1]+' choices'}); }
+    else if (tok==='loseitem'){
+      const ids = Object.keys(S.items).filter(i => S.items[i]>0 && G.items[i] && !G.items[i].relic && G.items[i].type!=='relic');
+      if (ids.length){ const id = ids[Math.floor(rnd(S)*ids.length)]; delItem(S, id, 1, R); R.text += ' (You lost your ' + G.items[id].n + '.)'; } else R.text += ' (Luckily, there was nothing they could take.)';
+    }
+    else if (tok==='forget'){
+      const C = G.classes[S.cls]; const ids = S.skills.filter(k => k !== (C && C.sig));
+      if (ids.length){ const id = ids[Math.floor(rnd(S)*ids.length)]; S.skills.splice(S.skills.indexOf(id), 1); R.tags.push({k:'note',t:'Forgot: '+G.skills[id].n}); R.text += ' (You can no longer do what ' + G.skills[id].n + ' let you do.)'; }
+    }
+    else if (tok==='quiz+'){
+      S.qs = (S.qs||0) + 1; let note = '';
+      if (S.qs % 2 === 0){ S.insight = Math.max(S.insight||0, 3); R.tags.push({k:'note',t:'💡 Insight for 3 choices'}); note = ' Your mind is sharp now: a streak of ' + S.qs + ' correct answers brings Insight for your next few choices.'; }
+      else if (rnd(S) < 0.35){ const g = S.story==='ashen' ? amt(S,'gold','s') : 3; S.gold += g; R.tags.push({k:'gold',v:g}); note = ' A small reward for a sharp mind.'; }
+      R.text += note;
+    }
+    else if (tok==='quiz-'){
+      S.qs = 0;
+      if (rnd(S) < 0.5){ const pen = ['hp-2','mp-3', S.story==='ashen' ? 'gold-s' : 'gold-3'][Math.floor(rnd(S)*3)]; applyFx(S, pen, R, o); R.text += ' That slip cost you.'; }
+      else R.text += ' No harm done, this time.';
+    }
     else throw new Error('unknown fx token: '+tok);
   }
 }
@@ -620,7 +642,7 @@ const isSafe = raw => {
   if (raw.safe === true) return true;
   if (raw.r || raw.mp || raw.act) return false;
   let worst = 0, die = false;
-  for (const br of [raw.y, raw.n]){
+  for (const br of [raw.y, raw.n, raw.risk ? ['', raw.risk[2]] : null]){
     if (!br) continue; const fx = Array.isArray(br) ? br[1] : '';
     for (const tok of (fx||'').split(/\s+/)){
       if (tok==='die') die = true;
@@ -668,6 +690,7 @@ function runOpt(S, o, R){
     if (ck.ok){ runBranch(S, raw.y, R); if (ck.nat===20){ R.text += ' ★ A critical triumph!'; applyFx(S,'xp+s',R,{}); } }
     else { runBranch(S, raw.n || ['Things go badly.','hp-s'], R); if (ck.nat===1){ R.text += ' ☠ A disastrous fumble!'; if(!o.safe) applyFx(S,'hp-1',R,{}); } }
   } else runBranch(S, raw.y, R);
+  if (raw.risk && !R.die && !S.battle){ const rk = raw.risk; if (rnd(S)*100 < rk[0]){ R.text += ' ' + fmt(S, rk[1]); R.risked = true; applyFx(S, rk[2], R, {}); } }
   if (raw.f) raw.f(S, R); // optional JS hook
 }
 function normOpt(S, raw){
@@ -699,6 +722,8 @@ G.resolveCur = function(S){
   throw new Error('bad cur '+JSON.stringify(c));
 };
 function finish(S, sc){
+  if (S.intro && (sc.kind==='static' || sc.kind==='gen') && !sc.end && G.chapters[S.intro]){ const ch = G.chapters[S.intro];
+    sc.text = fmt(S, (ch.sub ? '«'+ch.sub+'»\n' : '') + ch.text) + '\n' + sc.text; sc.introTitle = ch.n; }
   if (!sc.opts.some(o=>o.avail)) sc.opts.push({ raw:{y:['','']}, label:'Press on', avail:true, safe:true, req:null });
   for (const o of sc.opts){ if (!o.hide || o.avail) continue; o.gone = true; }
   sc.opts = sc.opts.filter(o=>!o.gone);
@@ -752,7 +777,7 @@ G.nextBeat = function(S){
     const q = b.indexOf('?'); if (q > 0 && !/^[~#@]/.test(b)){ if (!G.req(S, b.slice(0,q)).ok) continue; b = b.slice(q+1); }
     if (b.startsWith('~talk:')){ const pp = b.split(':'); S.cur = {kind:'gen', a:'ally_talk', p:{a:pp[1], t:+pp[2], s:S.choices+7}}; S.sv={}; return; }
     if (b[0]==='#'){ // chapter card
-      const id = b.slice(6); S.cur = {kind:'card', id}; S.sv = {}; S.cp = snapshot(S, true); return;
+      const id = b.slice(6); S.intro = id; S.sv = {}; S.cur = {kind:'resume'}; S.cp = snapshot(S, true); continue;
     }
     if (b[0]==='@'){ const R={text:'',tags:[]}; applyFx(S, b.slice(1), R, {}); continue; }
     if (b==='!gate'){
@@ -774,7 +799,7 @@ G.nextBeat = function(S){
 
 /* ---------------- player choice ---------------- */
 G.choose = function(S, idx){
-  const sc = G.resolveCur(S);
+  const sc = G.resolveCur(S); S.intro = null;
   const av = sc.opts.filter(o=>o.avail); const o = av[idx]; if (!o) return null;
   if (o.act) return { act:o.act };
   const R = { text:'', tags:[], roll:null, ok:true };
@@ -785,6 +810,7 @@ G.choose = function(S, idx){
   if (!S.battle || sc.kind!=='battle') checkDeath(S, R, mercy);
   let counted = sc.count && (!R.stay || R.countStay);
   if (counted) S.choices++;
+  if (counted && S.insight > 0) S.insight--;
   S.out = { n: S.choices, chosen: o.label, text: R.text, tags: R.tags, roll: R.roll, ok: R.ok, lines: R.lines };
   S.log.push({ n: counted?S.choices:0, sc: sc.title, c: o.label, t: R.text.length>260?R.text.slice(0,257)+'…':R.text, tags: R.tags.slice(0,10), roll: R.roll?{r:R.roll.r,tot:R.roll.total,dc:R.roll.dc,s:R.roll.stat,ok:R.roll.ok}:null, ok:R.ok });
   if (R.die){ S.dead = true; S.deathText = (R.deathText || R.text) + (R.hpDeath ? ' ' + G.deathLine(S) : ''); S.cur = {kind:'death'}; S.battle = null; return { dead:true }; }
@@ -1019,8 +1045,8 @@ G.useItem = function(S, id){
 /* ---------------- save / load ---------------- */
 function snapshot(S, noCp){ const c = Object.assign({}, S); delete c.cp; delete c.out; return JSON.stringify(c); }
 G.snapshot = snapshot;
-G.restore = function(json){ const S = JSON.parse(json); S.story = S.story||'ashen'; G.curStory = S.story; S.cp = null; S.out = null; S.dead = false; return S; };
-G.restoreCp = function(S){ const R = JSON.parse(S.cp); R.story = R.story||'ashen'; G.curStory = R.story; R.cp = S.cp; R.out = null; R.dead=false; R.battle=null; return R; };
+G.restore = function(json){ const S = JSON.parse(json); S.story = S.story||'ashen'; G.curStory = S.story; S.cp = null; S.out = null; S.dead = false; if (S.cur && S.cur.kind==='resume') G.nextBeat(S); return S; };
+G.restoreCp = function(S){ const R = JSON.parse(S.cp); R.story = R.story||'ashen'; G.curStory = R.story; R.cp = S.cp; R.out = null; R.dead=false; R.battle=null; if (R.cur && R.cur.kind==='resume') G.nextBeat(R); return R; };
 
 })(typeof globalThis !== 'undefined' ? globalThis : window);
 
@@ -1822,11 +1848,13 @@ A('riddle',{
     for (let k=0;k<20 && wrong.length<2;k++){ const w=RID[Math.floor(r()*RID.length)][1]; if (w!==q[1] && !wrong.includes(w)) wrong.push(w); }
     const answers = [q[1]].concat(wrong); for (let i=answers.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [answers[i],answers[j]]=[answers[j],answers[i]]; }
     const opts = answers.map(a => a===q[1] ?
-      { t:`"${a}."`, y:[`"Correct," comes the answer, and the way opens. A small gift is left for you.`,'xp+l loot'] } :
-      { t:`"${a}."`, y:[`A cold, patient silence. "Wrong." The consequences are immediate.`, dang?'hp-l':'hp-m'] });
-    opts.push({ t:`Reason it out with old lore`, r:'skill:lore|skill:detect|item:scholars_spectacles', c:'INT 11 lore', y:[`You turn the words in your mind until the answer clicks into place: "${q[1]}." The way opens.`,'xp+l loot'], n:[`The answer slips away. Wrong, and punished for it.`,'hp-s'] });
+      { t:`"${a}."`, y:[`"Correct," comes the answer, and the way opens. A small gift is left for you.`,'xp+l loot quiz+'] } :
+      { t:`"${a}."`, y:[`A cold, patient silence. "Wrong."`, 'xp+s quiz-'] });
+    opts.push({ t:`Reason it out with old lore`, r:'skill:lore|skill:detect|item:scholars_spectacles', c:'INT 11 lore', y:[`You turn the words in your mind until the answer clicks into place: "${q[1]}." The way opens.`,'xp+l loot quiz+'], n:[`The answer slips away. Wrong, this time.`,'xp+s quiz-'] });
     opts.push({ t:`Admit you don't know and walk away`, y:[`"Honest," it says, and grudgingly lets you turn aside.`,''], k:1 });
-    return { art:`${R.biomes[0]}|🧩`, title:'A Riddle in the Road', text:`${asker} "${q[0]}"`, opts };
+    let rtext = `${asker} "${q[0]}"`;
+    if ((S.insight||0) > 0){ const wi = opts.findIndex(o=>o.y && /quiz-/.test(o.y[1]) && !o.c); if (wi >= 0){ opts.splice(wi,1); rtext += '\n💡 Insight: your sharp mind rules out one answer.'; } }
+    return { art:`${R.biomes[0]}|🧩`, title:'A Riddle in the Road', text:rtext, opts };
   } });
 
 /* ---------- TREASURE ---------- */
@@ -1945,8 +1973,12 @@ G.miniArch = function(name, pool){
     make(S,p){
       const R=reg(S), e=pool[p.i], r=G.lr(p.s);
       const art = e[2].includes('|') ? e[2] : `${pk(r,R.biomes)}|${e[2]}`;
-      const opts = e[4].map(a => { const o = { t:a[0] }; if (a[1]) { o.c=a[1]; o.y=[a[2],a[3]||'']; o.n=[a[4]===undefined?'It goes poorly.':a[4], a[5]||'']; } else o.y=[a[2],a[3]||'']; if (a[6]) o.r=a[6]; if (a[7]) o.mp=a[7]; return o; });
-      return { art, title:e[1], text:e[3], opts };
+      const opts = e[4].map(a => { const o = { t:a[0] }; if (a[1]) { o.c=a[1]; o.y=[a[2],a[3]||'']; o.n=[a[4]===undefined?'It goes poorly.':a[4], a[5]||'']; } else o.y=[a[2],a[3]||'']; if (a[6]) o.r=a[6]; if (a[7]) o.mp=a[7]; if (a[8]) o.risk=a[8]; return o; });
+      let text = e[3];
+      /* a sharp mind (Insight) rules out one wrong answer in a quiz */
+      if ((S.insight||0) > 0 && opts.length > 2 && opts.some(o=>/(^| )quiz\+/.test((o.y&&o.y[1])||''))){
+        const wi = opts.findIndex(o=>/(^| )quiz-/.test((o.y&&o.y[1])||'')); if (wi >= 0){ opts.splice(wi,1); text += '\n💡 Insight: your sharp mind rules out one answer.'; } }
+      return { art, title:e[1], text, opts };
     } });
 };
 })();
@@ -3469,24 +3501,24 @@ sc('r4_sphinx','desert|🦁 🏛️',
  {t:`Sneak past while she yawns.`,c:'DEX 15 sneak',y:[`A paw-length at a time. You ease past her great flank, and the Company creeps behind. She snores. You breathe again.`,'xp+l'],n:[`A single huge eye opens. "Mmm," says the sphinx. "*Questions*."`,'flag:sphinx_angry >r4_sphinx_q1']},
  {t:`Find another route, even if it takes a week.`,y:[`A long, dry, labyrinthine detour round the canyon. A week of heat, but nobody gets eaten.`,'xp+m hp-m']} ]);
 sc('r4_sphinx_q1','desert|🦁 🧩',`"What has roots as nobody sees, is taller than trees, up, up it goes, and yet never grows?"`,[
- {t:`"A mountain."`,y:[`"Correct." The sphinx's eyes narrow. "Hmm." She tilts her head. "Second question."`,'xp+m >r4_sphinx_q2']},
- {t:`"A tall tree."`,y:[`"Wrong, but not by much." A paw swipes, razor claws grazing your arm. "Second question."`,'hp-m flag:sphinx_angry >r4_sphinx_q2']},
- {t:`"The wind."`,y:[`"Wrong." A paw swipes, and you are slammed against the rock. "Second question."`,'hp-m flag:sphinx_angry >r4_sphinx_q2']},
+ {t:`"A mountain."`,y:[`"Correct." The sphinx's eyes narrow. "Hmm." She tilts her head. "Second question."`,'xp+m quiz+ >r4_sphinx_q2']},
+ {t:`"A tall tree."`,y:[`"Wrong, but not by much." A paw swipes, razor claws grazing your arm. "Second question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q2']},
+ {t:`"The wind."`,y:[`"Wrong." A paw swipes, and you are slammed against the rock. "Second question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q2']},
  {t:`"I don't know. But I'll find out."`,y:[`"Honest." The sphinx tilts her head. "A cheap answer, but a true one. Second question."`,'xp+m flag:sphinx_angry >r4_sphinx_q2']} ]);
 sc('r4_sphinx_q2','desert|🦁 🧩',`"Alive without breath, as cold as death; never thirsty, ever drinking; all in mail, never clinking. What am I?"`,[
- {t:`"A fish."`,y:[`"Correct." The sphinx's tail twitches. "Third question."`,'xp+m >r4_sphinx_q3']},
- {t:`"A knight in armour."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A paw knocks you flat, but you roll aside. "Third question."`,'hp-l flag:sphinx_angry >r4_sphinx_q3']},
- {t:`"A knight in armour."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong, wrong, WRONG." The sphinx's great jaws open, a cavern of teeth. The canyon fills with her roar, and the last thing you see is the roof of her mouth.`,'die']},
- {t:`"A ghost."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A swat. "Third question."`,'hp-l flag:sphinx_angry >r4_sphinx_q3']},
- {t:`"A ghost."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong." The sphinx pounces. It is very fast, and very final.`,'die']},
- {t:`Ask for a hint.`,c:'CHA 13 persuade',y:[`"Hmph." The sphinx sniffs. "It swims." A slow wink. "Answer."`,'xp+m >r4_sphinx_q2'],n:[`"No hints." A swipe.`,'hp-m flag:sphinx_angry >r4_sphinx_q2']},
+ {t:`"A fish."`,y:[`"Correct." The sphinx's tail twitches. "Third question."`,'xp+m quiz+ >r4_sphinx_q3']},
+ {t:`"A knight in armour."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A paw knocks you flat, but you roll aside. "Third question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q3']},
+ {t:`"A knight in armour."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong, wrong, WRONG." The sphinx's jaws open, and her roar flattens you against the rock. Ears ringing, you are shaken but unharmed. "Third question."`,'hp-l xp+s quiz- >r4_sphinx_q3']},
+ {t:`"A ghost."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A swat. "Third question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q3']},
+ {t:`"A ghost."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong." The sphinx pounces and pins you flat with one great paw, thinks better of it and lets go. "Third question."`,'hp-l xp+s quiz- >r4_sphinx_q3']},
+ {t:`Ask for a hint.`,hide:true,r:'!flag:sphinx_hint',c:'CHA 13 persuade',y:[`"Hmph." The sphinx sniffs. "It swims." A slow wink. "Answer."`,'xp+m flag:sphinx_hint >r4_sphinx_q2'],n:[`"No hints." A swipe.`,'xp+s quiz- flag:sphinx_angry flag:sphinx_hint >r4_sphinx_q2']},
  {t:`Admit you cannot answer, and bow your head.`,y:[`"Honest," says the sphinx, sniffing. A paw taps you, not unkindly. "Third question."`,'hp-1 flag:sphinx_angry >r4_sphinx_q3']} ]);
 sc('r4_sphinx_q3','desert|🦁 🧩',`"Last, and I think hardest. I hold the dead, the living and the not yet born. I have no end and no beginning. Every one of you will leave me, but none can stay. What am I?"`,[
- {t:`"Time."`,y:[`A long silence. The sphinx's copper eyes soften. "Time," she says, quietly. "Yes." She stands, stretches, and steps aside. "Go. And take this, for I have not been asked a good question in a thousand years."`,'xp+xl loot:trink flag:sphinx_friend'.replace('xp+xl','xp+l')]},
+ {t:`"Time."`,y:[`A long silence. The sphinx's copper eyes soften. "Time," she says, quietly. "Yes." She stands, stretches, and steps aside. "Go. And take this, for I have not been asked a good question in a thousand years."`,'xp+xl loot:trink flag:sphinx_friend quiz+'.replace('xp+xl','xp+l')]},
  {t:`"Memory."`,hide:true,r:'!flag:sphinx_angry',y:[`"Almost." The sphinx tilts her head. "Almost is not enough. But you amuse me. Go." She wafts a paw.`,'xp+l hp-s']},
- {t:`"Memory."`,hide:true,r:'flag:sphinx_angry',y:[`"Almost," says the sphinx. "But I am hungry." The Company screams.`,'die']},
+ {t:`"Memory."`,hide:true,r:'flag:sphinx_angry',y:[`"Almost," says the sphinx. "But I am hungry." She pins you flat with one paw, sniffs, and sighs. "...Go."`,'hp-l xp+s quiz-']},
  {t:`"Death."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." She swipes. "But you've had two right, and I'm bored. Go."`,'hp-l xp+m']},
- {t:`"Death."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong. Oh, so wrong." There's a very quiet, very final crunch.`,'die']},
+ {t:`"Death."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong. Oh, so wrong." A paw the size of a cartwheel pushes you across the sand. "Go, before I change my mind."`,'hp-l xp+s quiz-']},
  {t:`Admit defeat and ask for mercy.`,y:[`"Hm." The sphinx studies you. "A coward's answer — but a living one." A lazy paw sweeps you aside. "Go."`,'hp-2 xp+s']},
  {t:`"Love."`,hide:true,r:'!flag:sphinx_angry',y:[`A pause. The sphinx's eyes widen. "No," she says, softly. "But..." Her voice trails. "Go. I will think about that for a century."`,'xp+l hp-s']},
  {t:`"Love."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong," says the sphinx. But she doesn't pounce. She sits very still, and a tear runs down her golden cheek. "Go," she says. "Before I change my mind."`,'xp+l hp-m']} ]);
@@ -4761,7 +4793,7 @@ const TR = [
 ];
 // convert trivia into mini entries (rotate answers so the right one is not always first)
 const trivia = TR.map((t,i) => { const [f,q,a,fact] = t; const order=[0,1,2]; const rot=i%3; const o = order.map((_,k)=>(k+rot)%3);
-  const opts = o.map(idx => idx===0 ? [a[0],'',`Correct! ${fact}`,`xp+m mp+1`] : [a[idx],'',`Not quite. The answer is "${a[0]}". ${fact}`,`xp+s`]);
+  const opts = o.map(idx => idx===0 ? [a[0],'',`Correct! ${fact}`,`xp+m mp+1 quiz+`] : [a[idx],'',`Not quite. The answer is "${a[0]}". ${fact}`,`xp+s quiz-`]);
   return [f, 'Singapore Quiz', '❓', q, opts]; });
 G.miniArch('cg_trivia', trivia);
 
@@ -4996,7 +5028,7 @@ const Q = [
 ];
 const FR = [['An old scholar in the agora stops you.','🧓'],['A priestess tests you at a wayside shrine.','🔮'],['A sailor on the jetty grins at you.','⚓'],['A boy selling olives asks you a riddle.','🫒'],['A curious traveller on the road asks you a question.','🧭'],['An owl on a column hoots, and a voice in your head asks.','🦉'],['A potter pauses at his wheel and asks.','🏺']];
 const trivia = Q.map((q,i)=>{ const [qq,right,w1,w2,fact]=q; const fr=FR[i%FR.length]; const rot=i%3; const arr=[[right,true],[w1,false],[w2,false]]; const ord=[0,1,2].map(k=>arr[(k+rot)%3]);
-  const opts = ord.map(([t,ok])=> ok ? o(t, `Correct! ${fact}`, i%4===0?'xp+m mp+1 gold+4':'xp+m mp+1') : o(t, `Not quite. The answer is "${right}". ${fact}`, 'mp-1 xp+s'));
+  const opts = ord.map(([t,ok])=> ok ? o(t, `Correct! ${fact}`, 'xp+m mp+1 quiz+') : o(t, `Not quite. The answer is "${right}". ${fact}`, 'xp+s quiz-'));
   return ['any','A Question for You',fr[1],`${fr[0]} "${qq}"`, opts]; });
 G.miniArch('gr_trivia', trivia);
 
@@ -5150,9 +5182,9 @@ L('gr_forge','The Cyclopes\' Anvil','🔨',`Three huge, one-eyed Cyclopes, Hepha
  c('Offer to hold the bar with tongs.','STR 10 endure','You grip it hard, shoulders burning. The Cyclops nods respectfully.','xp+l mp+3 hp-2','The bar is heavy. A Cyclops takes it back with gentle amusement.','xp+s hp-2'),
  o('Applaud when they are done.','Thunderous applause from one human. They seem touched.','xp+m mp+2')),
 L('gr_forge','A Smith\'s Riddle','🧩',`A young apprentice with a soot-black face sets a riddle: "I have a mouth but never speak. I have a bed but never sleep. I run but have no legs. What am I?"`,
- o('"A river."','"Correct!" he grins. "Mouth, bed and running. Everyone gets it eventually." He gives you a handful of figs.','xp+m +gr_figs mp+2'),
- o('"A furnace."','"Close, but it does not run," he says kindly. "Think wetter."','xp+s mp+1'),
- o('"A secret."','"Hm," he says. "Secrets don\'t have beds." He still laughs.','xp+s mp+1')),
+ o('"A river."','"Correct!" he grins. "Mouth, bed and running. Everyone gets it eventually." He gives you a handful of figs.','xp+m +gr_figs mp+2 quiz+'),
+ o('"A furnace."','"Close, but it does not run," he says kindly. "Think wetter."','xp+s quiz-'),
+ o('"A secret."','"Hm," he says. "Secrets don\'t have beds." He still laughs.','xp+s quiz-')),
 // --- Hades
 L('gr_hades','The Asphodel Fields','🌾',`Grey flowers sway under a grey sky. Pale shapes drift among them, the spirits of ordinary people: farmers, bakers, midwives. They are quiet, not unhappy, only faded.`,
  o('Walk quietly among them.','Nobody speaks to you, but several turn their heads as you pass. You nod politely at each one.','xp+m mp+2'),
@@ -6804,7 +6836,7 @@ const S_ = (id, title, art, text, opts, extra) => G.sc(id, art, text, opts, Obje
 const QS = (id, title, art, text, ans, msgs, fx) => {
   const arr = [{t:ans[0],ok:1},{t:ans[1],w:1},{t:ans[2],w:2}]; const rot = (id.length*7 + id.charCodeAt(id.length-1)) % 3;
   const ord = [0,1,2].map(k => arr[(k+rot)%3]);
-  S_(id, title, art, text, ord.map(e => e.ok ? {t:e.t, y:[msgs[0], fx||'xp+l mp+2']} : {t:e.t, hide:true, r:'!sv:w'+e.w, y:[msgs[e.w], 'mp-1 xp+s svflag:w'+e.w+' stayc']}));
+  S_(id, title, art, text, ord.map(e => e.ok ? {t:e.t, y:[msgs[0], (fx||'xp+l mp+2')+' quiz+']} : {t:e.t, hide:true, r: e.w===1 ? '!sv:w1&!insight' : '!sv:w2', y:[msgs[e.w], 'xp+s quiz- svflag:w'+e.w+' stayc']}));
 };
 G.grh = { S_, QS };
 
@@ -7511,8 +7543,8 @@ L('any','Shipwreck Swim','🌊',`A rogue wave smashes into the little fishing bo
  o('Float on your back and wait for rescue.',`Twenty minutes later, a boat finds you. Cold, wet and alive.`,'xp+s hp-2'),
  dare('Call on Poseidon for mercy. (Costs Favor)',3,`The sea heaves, and a large, smooth swell rolls you and the boy up the beach as gently as a hand. Poseidon, it seems, was listening.`,'xp+l hp+2 flag:gr_respect')),
 L('any','The Nymph\'s Riddle','🧚',`A water nymph peeps from a spring, grinning. "A riddle for a drink of the sweetest water in Greece! What is always coming, but never arrives?"`,
- o('"Tomorrow."',`She claps in delight and fills a flask. The water is cold, clear and sweet, and you feel refreshed in body and mind.`,'xp+m hp+6 mp+4'),
- o('"A ship."',`"Ha! Close, but ships do arrive." She dips her fingers and flicks a few drops at you, laughing.`,'xp+s mp+1'),
+ o('"Tomorrow."',`She claps in delight and fills a flask. The water is cold, clear and sweet, and you feel refreshed in body and mind.`,'xp+m hp+6 mp+4 quiz+'),
+ o('"A ship."',`"Ha! Close, but ships do arrive." She dips her fingers and flicks a few drops at you, laughing.`,'xp+s quiz-'),
  o('Pay 2 drachmae for a flask instead.',`She rolls her eyes and fills it for the price. The water is just as good.`,'gold-2 hp+4 mp+2','gold:2')),
 L('any','Centaur Race','🏇',`A centaur at a crossroads stamps and snorts. "You walk like a slug," he says. "Race me to that tree, and if you win, I will carry you to Delphi."`,
  c('Race him flat out.','DEX 10 dodge',`Neck and neck, to the very last stride. You lunge at the tree and touch it a fingernail before his hoof. "By Zeus!" he gasps, and honours the wager.`,'xp+l mp+3 hp-1','He wins by three lengths, laughing. "Next time, slug!"','xp+s'),
@@ -7802,8 +7834,8 @@ L('any','Wet Market Slip','🐟',`The floor of the wet market is slick with wate
  o('Walk slowly, holding the rail.',`Step by cautious step. The market is a very slippery place for a very careful kid.`,'xp+s'),
  o('Buy a pair of rubber slippers ($3).',`A pair of bright blue slippers. They grip like glue. Your day is much safer.`,'gold-3 xp+m mp+2','gold:3')),
 L('any','Kopitiam Uncle\'s Riddle','☕',`At a corner kopitiam, an old uncle slides a cup of kopi across the table. "Answer my riddle, and the kopi is free. What has a face and two hands, but no arms or legs?"`,
- o('"A clock!"',`"Smart kid!" He pushes the cup and a kaya toast to you. "Free. Nobody gets it these days."`,'xp+m hp+6 mp+3'),
- o('"A person!"',`"Hm, close," he says gently. "Think about the time." He lets you try again, and still gives you a toast for trying.`,'xp+s hp+3'),
+ o('"A clock!"',`"Smart kid!" He pushes the cup and a kaya toast to you. "Free. Nobody gets it these days."`,'xp+m hp+6 mp+3 quiz+'),
+ o('"A person!"',`"Hm, close," he says gently. "Think about the time." He lets you try again, and still gives you a toast for trying.`,'xp+s hp+3 quiz-'),
  o('Pay $2 for the kopi and chat.',`Sweet, strong, steaming. The uncle tells you three stories, and one of them is about a lantern on the beach.`,'gold-2 xp+m mp+3 hp+4','gold:2')),
 L('any','Flash Flood at the Drain','🌊',`The drain by the playground is a brown torrent. A little girl\'s ball has floated into it, and she is leaning dangerously over the edge to catch it.`,
  o('Shout at her to stay back and fetch the ball with a stick.',`You fish it out with a branch, and hand it back. She hugs it, and then you. "My hero."`,'xp+m mp+3 flag:cg_kind'),
@@ -8100,6 +8132,188 @@ c2.splice(at, 0,
 
 </script>
 <script>
+/* TRICKY CHOICES — not every "safe-looking" option is safe.
+   Eating street food, trusting a stranger's help, accepting a "free" offer or buying a bargain can backfire: lost money, lost items,
+   a forgotten skill, a curse, or (rarely) the end of the journey. Every scene still keeps one genuinely safe way through,
+   and quiz answers are never trapped: a right answer is always right.
+   An option can carry a hidden  risk = [percent, message, effects]  that is rolled after the normal outcome. */
+(function(){
+const G = globalThis.G;
+const RK = (p, msg, fx) => [p, msg, fx];
+const o = (t, y, fx, req, risk) => [t,'',y,fx||'xp+s','','',req||'',0,risk];
+const c = (t, chk, y, fx, n, nfx, req, risk) => [t,chk,y,fx||'xp+m',n||'It does not work out.',nfx||'xp+s',req||'',0,risk];
+const L = (reg, title, em, text, ...opts) => [reg, title, em, text, opts];
+
+/* ================= CASUARINA: Singapore street smarts ================= */
+G.miniArch('cg_trick', [
+L('any','A Free Drink','🥤',`At a roadshow booth, a very smiley man in a bright polo shirt hands out free sample drinks. They are blue, fizzy and have no label. "Go on," he says warmly. "Everyone is trying it."`,
+ o('Take a cup and drink it.',`Sweet, fizzy and very, very blue.`,'xp+s hp+2','',RK(25,'Something is not right. The world tilts, your knees fold, and the next thing you know, a nurse is shaking her head in a clinic and calling {guardian}. "Never drink from strangers," she says, very gently. Your adventure ends here.','die')),
+ o('Politely say no thank you.',`He shrugs and moves on to the next person. A very sensible kid, you think, proudly.`,'xp+m mp+2 flag:cg_smart'),
+ c('Ask to see the ingredients first.','INT 8 lore',`He goes quiet, and has no answer. You walk away, a little taller.`,'xp+m mp+2 flag:cg_smart','He waves a hand and turns away. You walk on, wiser.','xp+s')),
+L('any','Uncle Knows a Shortcut','🧓',`A friendly uncle in a straw hat sees you looking at your map. "Changi? Aiyah, so far! I know a shortcut, very fast, no traffic. Follow me!"`,
+ o('Ask him to show you the way.',`He chats happily the whole time, and you follow.`,'xp+s','',RK(40,'The "shortcut" ends at a locked fence and a very bored security guard. You lose half an hour, your nerve, and a few coins to a vending machine you did not need.','mp-3 gold-3')),
+ o('Thank him and follow the main road.',`It takes longer, but you know exactly where you are going. The uncle waves cheerfully.`,'xp+s mp+1'),
+ c('Check the route on your phone map first.','INT 8 lore',`The map shows a perfectly good road. You thank the uncle and take it.`,'xp+m mp+2','Your phone has no signal. You decide to stay on the main road, to be safe.','xp+s')),
+L('any','Hold My Bag, Please','🎒',`A young man with a heavy backpack and a worried face rushes up to you. "Hold my bag for one minute? My shoelace! My bus is leaving!" He thrusts the bag at you before you can answer.`,
+ o('Hold it for a minute.',`You take it, and look at the bus.`,'xp+s','',RK(35,'He walks round the corner and never comes back. The bag is full of newspapers, and while you were staring at it, a hand has found your pocket money.','gold-5 loseitem')),
+ o('Say you cannot, and keep walking.',`"Please?" he calls. You shake your head and keep going. A good rule: never hold a stranger's bag.`,'xp+m mp+2 flag:cg_smart'),
+ o('Point him to the bus stop guard.',`The guard takes one look at him, and at the bag, and asks him some questions. The young man suddenly remembers he is late for something else.`,'xp+m mp+2 flag:cg_smart')),
+L('any','The Bargain Torch','🔦',`A stall near the MRT sells torches, "BRAND NEW, ONLY $2, LAST PIECE". The seller leans in. "Very bright. Very strong. I give you good price, because you are my best customer."`,
+ o('Buy the $2 torch.',`You hand over the coins, and he presses the torch into your hand with great ceremony.`,'gold-2 +cg_penlight xp+s','gold:2',RK(50,'The torch flickers once, gasps, and dies. A dud. The seller is somehow already gone.','-cg_penlight')),
+ c('Switch it on and test it before you pay.','INT 8 craft',`It flickers, and dies. "Wah, battery problem," says the seller, unabashed. You hand it back and walk on.`,'xp+m mp+2 flag:cg_smart','It works, just about. You pay, and hope.','gold-2 +cg_penlight xp+s','gold:2'),
+ o('Walk on. You have a torch already, or you will find one.',`There are better shops in Changi Village anyway.`,'xp+s')),
+L('any','Durian Samples','🍈',`An auntie at a fruit stall waves a tray of golden durian. "Try, try! Free sample! Sweet! Very good for body!" The smell is enough to stop a bus.`,
+ o('Eat a piece.',`Creamy, rich, sweet and extremely strong. Somewhere between heaven and a gas leak.`,'xp+m mp+2','',RK(25,'It is stronger than your stomach expected. You spend a miserable ten minutes in the nearest toilet, whimpering.','hp-3 mp-3')),
+ o('Sniff it, smile and say, "Next time, auntie!"',`She laughs, and gives you a free mandarin instead.`,'xp+s mp+2 +cg_oranges'),
+ o('Ask her how to choose a good one.',`"Shake it," she says. "If you hear the seed, it is ripe." You tuck that away.`,'xp+m')),
+L('any','A Prize Message','📱',`Your phone buzzes: "CONGRATULATIONS! You have won a limited-edition Merlion plush! Click this link to claim within 10 minutes!" A countdown timer is ticking.`,
+ o('Click the link and claim it.',`A glossy page loads, asking for a few small details.`,'xp+s','',RK(70,'The page wants a parent\'s card number. You close it, but a pop-up has already charged you a "processing fee".','gold-8')),
+ o('Delete the message and block the number.',`Gone. Anything with a countdown timer and a free prize is almost always a trap.`,'xp+m mp+2 flag:cg_smart'),
+ o('Show it to a grown-up.',`"Scam," says {guardian}, in about two seconds. You feel clever for asking.`,'xp+m mp+2 flag:cg_smart')),
+L('any','The Mystery Smoothie Dare','🧪',`At the void deck, a group of older kids hold up a plastic cup of grey-green sludge. "Dare you," says one. "Drink it all and we give you $5. Chicken?"`,
+ o('Drink it all.',`You hold your nose and chug.`,'xp+s','',RK(45,'It is chilli sauce, soy sauce, old milo and something that used to be fruit. Your eyes water for a full minute, and the older kids laugh until they cry. No $5, either.','hp-2 mp-3')),
+ o('Say "Nope, not funny," and walk away.',`They shrug, a bit let down. Saying no is a bit scary, but it is a lot easier than the smoothie.`,'xp+m mp+2'),
+ c('Offer them a better dare instead.','CHA 8 persuade',`"Eat a raw chilli padi? Race to the lift? I will do that." They are impressed, and your reputation takes a big leap.`,'xp+m mp+3','They are not impressed. You walk away, shrugging.','xp+s')),
+L('any','The Slippery Bridge','🌉',`The quickest way to your bus stop is across a narrow wooden footbridge over a drain. It is wet, mossy and has a sign saying CAUTION: SLIPPERY. Someone has added, in marker pen: "VERY".`,
+ o('Cross carefully, one step at a time.',`Shuffle, shuffle, shuffle. The bridge sags a bit, but holds.`,'xp+s mp+1','',RK(20,'A plank snaps under your foot, and you plunge into the shallow canal, soaked, bruised and covered in duckweed. Something floats away from your bag.','hp-3 loseitem')),
+ o('Go round by the road.',`Five minutes longer, and perfectly dry.`,'xp+s'),
+ c('Test each plank with your foot first.','WIS 8 survive',`Tap, tap, tap. The third plank rattles. You skip over it and arrive safely.`,'xp+m mp+2','Everything seems fine until the last plank. You slip, but catch the rail.','xp+s hp-1')),
+L('any','A Free Reading','🔮',`Outside a temple, an old man with a tiny table and a pet bird says, "Free reading for young people today! No charge! Sit, sit."`,
+ o('Accept the free reading.',`The bird picks a card. The old man reads it aloud, slowly and thoughtfully.`,'xp+m mp+2','',RK(60,'"And the interpretation," he says, with a polite smile, "is $8." You pay, because you cannot think of a way to say no.','gold-8')),
+ c('Ask first: "Is it really free?"','CHA 8 persuade',`He sighs. "Not exactly." You thank him and leave, wiser.`,'xp+m mp+2 flag:cg_smart','He just waves the bird at you. You smile and walk on.','xp+s'),
+ o('Politely walk on.',`The bird looks cross. The old man waves anyway.`,'xp+s')),
+L('any','The Charity Collector','🎗️',`A man with a clipboard and a big smile blocks the pavement. "Support disabled children! Just $5, right now, and you get a sticker!" You cannot see any ID or permit.`,
+ o('Donate $5 on the spot.',`You hand over the money, and he gives you a sticker, which says nothing in particular.`,'xp+s gold-5','gold:5',RK(55,'He pockets the cash and vanishes into the crowd. The "charity" does not exist, and you feel more than a little foolish.','mp-2')),
+ c('Ask to see his ID and permit.','INT 8 lore',`He suddenly remembers an urgent appointment. A real collector would have had both ready.`,'xp+m mp+2 flag:cg_smart','He shows a laminated card that looks real. You still decide to donate through your school instead.','xp+s'),
+ o('Say you donate through school, and walk on.',`He tries one more smile, and moves on to the next person.`,'xp+s mp+1')),
+L('any','A Lift in the Rain','🚗',`A sudden storm. You are at the bus stop, drenched. A car pulls up, and a friendly man in the driver's seat winds down the window. "Wah, so wet! Hop in, I go your way. Free!"`,
+ o('Accept the lift.',`The back seat is warm, and the heater is on.`,'xp+s hp+2','',RK(35,'The car does not turn toward Tampines. By the time you shout, the doors are locked, and a long, frightening time passes before he lets you out. The police take you home. Your adventure ends here.','die')),
+ o('Say no, and wait under the shelter.',`He frowns, winds up the window, and drives off. You are wet, but you are safe.`,'xp+m mp+2 flag:cg_smart'),
+ o('Phone {guardian} for a pick-up.',`"Stay right there," says {guardian}. Twenty minutes later, you are in a warm car, wrapped in a towel.`,'xp+m hp+4 mp+3 flag:cg_smart')),
+L('any','The Mystery Can','🥫',`A battered vending machine near the old block sells a "MYSTERY CAN: $2". The label has faded to a smear. Somebody has scrawled "Edible?" beside it.`,
+ o('Buy the mystery can.',`Clunk. A can rolls out, cold and unlabelled.`,'gold-2 xp+s','gold:2',RK(35,'It tastes of metal and old pineapple. Everything about it is expired. Your stomach clenches.','hp-3 mp-2')),
+ o('Buy a plain bottle of water ($1).',`Boring, but exactly what you needed.`,'gold-1 hp+3 xp+s','gold:1'),
+ o('Leave it, and drink from your own bottle.',`You sip from your flask and move on.`,'xp+s')),
+L('any','The Helpful Boy','🧒',`A boy of about your age wanders up and offers, cheerfully: "I will watch your stuff while you queue for the bubble tea. Fifty cents." He grins. He looks harmless.`,
+ o('Pay him 50 cents to watch your bag.',`He sits down beside it with a very serious face.`,'gold-1 xp+s','gold:1',RK(35,'You return to an empty spot. The boy, and the bag, and a few useful things in it, are gone.','loseitem gold-2')),
+ o('Take your bag with you in the queue.',`A bit annoying, but it never leaves your sight.`,'xp+s mp+1'),
+ o('Ask a friend to hold it.',`Better. Your friend is happy to help, and nobody disappears.`,'xp+m mp+2','anyally'))
+]);
+
+/* ================= THE THREAD OF THE MOIRAI: the gods' world is full of traps ================= */
+G.miniArch('gr_trick', [
+L('any','The Lotus Eaters','🌸',`On a quiet beach, a group of smiling people in loose robes offer you honey-sweet pink flowers. "Eat," they murmur. "Rest. Forget your troubles. Stay a while." Their eyes are very happy, and very far away.`,
+ o('Eat a lotus flower.',`Honey, jasmine and sleepy sunshine. You feel wonderfully calm.`,'xp+s mp+3','',RK(50,'Your worries melt away, and so does something else. A skill you used to know slips out of your head like water through fingers.','forget')),
+ o('Politely refuse and walk on.',`They sigh, gently disappointed, and offer the flowers to the next passer-by.`,'xp+m mp+2 flag:gr_respect'),
+ c('Ask what the flowers do.','WIS 8 spirit',`You realise at once. Odysseus lost days to this. You thank them and leave, rattled.`,'xp+l mp+2 flag:gr_respect','They only smile. You decide not to find out.','xp+s')),
+L('any','Free Passage','⛵',`At a small harbour, two friendly sailors wave. "Going to Corinth? We give you free passage! No charge! Come, come, we leave at once!" Their boat is nicer than most.`,
+ o('Accept the free passage.',`You step aboard. They are very helpful with your bags.`,'xp+s','',RK(35,'Halfway across, one of them "accidentally" lifts your purse, and the other "accidentally" drops your pack overboard. They shrug, and set you down on a lonely beach.','gold-6 loseitem')),
+ o('Decline and find an honest boatman.',`It takes an hour, but you pay a fair fare to a grumpy old man who gives you a bruised apple as change.`,'xp+m mp+2'),
+ c('Ask them to swear an oath by Poseidon.','CHA 8 persuade',`They go pale, mutter, and suddenly remember they have somewhere else to be. You walk on, smiling.`,'xp+l mp+2','They swear, carelessly. You still feel uneasy, and decide to walk.','xp+s')),
+L('any','The Sealed Jar','🏺',`A weary pilgrim by the road holds a sealed clay jar. "Carry this to the temple in the next village for me, young one? My knees! Just do not, whatever you do, open it." He presses it into your hands.`,
+ o('Carry the jar to the temple.',`It is heavier than it looks, and something inside shifts.`,'xp+m mp+2','',RK(25,'On the way, curiosity gets the better of you. You lift the lid, just a crack. Something small, grey and unhappy flutters out and settles on your shoulder. It follows you for a day, and you feel dreadful.','hp-3 mp-3')),
+ o('Politely refuse.',`He sighs. "A wise choice, perhaps." He turns away to find someone else.`,'xp+s mp+1'),
+ o('Offer to wait with him until help comes.',`You sit with him in the shade, and share your water. In the end, his grandson turns up and carries it.`,'xp+m mp+3 flag:gr_kind')),
+L('any','The Golden Spring','✨',`A small spring bubbles out of the rock, with a rim of gold foam. A sign in old Greek reads "Sweet water for the weary." A few glittering fish flicker in the pool. You are very thirsty.`,
+ o('Drink from the spring.',`Cool, sweet and tingling.`,'xp+s hp+4 mp+2','',RK(40,'It is sweeter than water has any right to be. When you lift your head, you cannot remember something you always knew how to do.','forget')),
+ o('Fill your water bottle from the stream downhill.',`A little further, a plain stream trickles through ferns. The water is cold and clear and entirely ordinary.`,'xp+s hp+3 mp+1'),
+ c('Test a few drops on your tongue first.','WIS 8 survive',`It tastes sharp, strange and wrong. You spit it out, and walk on.`,'xp+m mp+2','It tastes fine. But you have a feeling, so you do not risk more.','xp+s')),
+L('any','A Gift from a Smiling Merchant','🎁',`A merchant with a gold-embroidered cloak and a wide, wide smile steps into your path. "A gift! A little token of friendship from a humble traveller. Please, accept this lovely box."`,
+ o('Accept the beautiful box.',`It is heavy, and carved with tiny horses.`,'xp+s','',RK(40,'You open it, later. A furious swarm of bees pours out. When you stop running, your arm is swollen, and the box, and part of your pack, have been left behind.','hp-3 loseitem')),
+ o('Thank him warmly, but decline.',`His smile does not change, but his eyes do. He bows and walks away, quickly.`,'xp+m mp+2 flag:gr_respect'),
+ c('Ask him to open it first.','INT 8 lore',`He hesitates a fraction too long. You hand it back, and he trots away, muttering.`,'xp+l mp+2','He opens it, and it is just ribbons. You still feel odd, and decline.','xp+s')),
+L('any','The Satyr Guide','🐐',`A satyr sits on a rock, scratching his beard. "Lost, are you? Say no more! I know every path in Greece. Just you follow old Silenus. Drop of wine for the trouble?" He winks, and smells strongly of grapes.`,
+ o('Ask the satyr to guide you.',`He bounds off, whistling, with a happy skip.`,'xp+s','',RK(50,'After three drinks, he gets distracted by a nymph, and leads you in two very long circles. You lose half the day, a good deal of your patience, and a few coins to "refreshments".','mp-2 hp-1 gold-3')),
+ o('Politely thank him and read the milestones yourself.',`The signs are old-fashioned, but they are clear. You get there, sunburnt but accurate.`,'xp+m mp+1'),
+ c('Make him swear by Dionysus to stay sober.','CHA 8 persuade',`He is so touched that he stays sober for almost an hour, and gets you there safely.`,'xp+l mp+3','He promises, but his promise does not outlast the first vineyard.','xp+s')),
+L('any','The Mushroom Ring','🍄',`In a shaded glade, a ring of pale mushrooms glows softly. They smell of bread and honey. A hungry goat is eyeing them. You have not eaten since the morning.`,
+ o('Pick a few and eat them.',`They are chewy, earthy and not at all bad.`,'xp+s hp+3','',RK(20,'The glade tilts. Everything goes silver, and soft, and warm. When you open your eyes, you are in a long queue of pale shapes on a grey shore, and a ferryman is shaking his head. "Too early," says Charon. "Come back later." Your adventure ends here.','die')),
+ o('Eat your own bread and leave the mushrooms.',`The goat looks hopeful. You break off a piece for him.`,'xp+m mp+2'),
+ c('Ask the goat what it thinks.','WIS 8 survive',`The goat sniffs the ring once, sneezes and trots away. You take the hint.`,'xp+m mp+2','The goat shrugs and eats grass instead.','xp+s')),
+L('any','A Blessing for a Price','🛕',`A tall priest in a bleached robe sits outside a small shrine. "A blessing, traveller? Five drachmae, and Zeus himself will smile on your road. Many are blessed here. None regret it."`,
+ o('Pay 5 drachmae for the blessing.',`He mumbles over you, and touches your forehead with ash.`,'gold-5 xp+s','gold:5',RK(50,'His "blessing" is mumbled nonsense, and your purse is lighter. Worse, you feel suddenly sluggish, as though something has settled on you.','st:curse3')),
+ o('Leave a small, silent offering at the altar.',`A flower, a pebble, a quiet word. The shrine accepts it.`,'xp+m mp+2 flag:gr_respect'),
+ c('Ask which god he serves, and how long he has been a priest.','WIS 8 spirit',`His answers are vague and contradictory. You thank him politely and go on.`,'xp+m mp+2','He answers smoothly. You are unsure, so you do not pay.','xp+s')),
+L('any','The House Special','🍲',`At a small inn, the innkeeper rubs his hands. "Today's special! My famous fish stew, only three drachmae! The recipe has been in my family for generations." A rich smell wafts from the pot. A suspicious number of flies cluster at the rim.`,
+ o('Order the house special.',`A steaming bowl arrives, thick with fish and herbs.`,'gold-3 hp+6 xp+s','gold:3',RK(30,'It is at least three days old. You spend the night regretting every spoonful.','hp-3 mp-3')),
+ o('Eat your own bread and olives.',`Simple and safe. The innkeeper rolls his eyes.`,'xp+s hp+2'),
+ c('Ask when the stew was made.','CHA 8 persuade',`He splutters. "This morning! Mostly." You decide on bread.`,'xp+m mp+2','He says "this morning", and looks away. You are not convinced.','xp+s')),
+L('any','The Lucky Amulet','📿',`A man with a tray of amulets calls out, "Protection from the evil eye! Protection from harpies! Protection from everything! Six drachmae, only today!" His amulets all look suspiciously alike.`,
+ o('Buy an amulet.',`It is bright blue glass on a leather string.`,'gold-6 xp+s mp+2','gold:6',RK(70,'It does nothing at all. A few steps later, the "glass" turns green and crumbles, and so, a little, does your faith in bargains.','mp-2')),
+ o('Politely decline.',`He is already calling to the next customer.`,'xp+s'),
+ c('Ask him to explain what each charm protects against.','INT 8 lore',`He gets tangled in his own explanation, and you leave with a smile.`,'xp+m mp+2','He fires off a ten-minute speech. You nod politely and leave.','xp+s')),
+L('any','A Boy Offers to Watch Your Pack','🎒',`A ragged boy with big eyes and an even bigger smile offers: "I will guard your pack while you visit the temple, for one obol. I am very honest. Everyone says so."`,
+ o('Pay him an obol to guard your pack.',`He sits on it like a hen on an egg, with a solemn face.`,'gold-1 xp+s','gold:1',RK(35,'You return to find an empty patch of dust. The boy, and your pack, and some of what was in it, have vanished.','loseitem gold-2')),
+ o('Carry your pack with you.',`A bit heavy, but safe, and you keep all your things.`,'xp+s mp+1'),
+ o('Ask a priestess to keep it safe.',`She places it behind the altar. "Gods do not steal," she says, gravely.`,'xp+m mp+2 flag:gr_respect'))
+]);
+
+/* ================= THE ASHEN QUEEN: the road is full of liars ================= */
+G.miniArch('roadtrick', [
+L('any','A Shortcut Offered','🗺️',`A cheerful stranger in a good cloak falls into step beside you. "Heading to the next town? I know a shortcut. Saves a day. Not many know it. Follow me, friend."`,
+ o('Follow him.',`He chats pleasantly, and leads you down a narrow track.`,'xp+s','',RK(40,'The track ends in a ditch, three of his friends and a very unfriendly knife. By the time you break away, you have lost a purse and a bag.','hp-m loseitem gold-s')),
+ o('Politely decline, and stay on the road.',`He shrugs and ambles away, whistling. You keep your eyes open until he is out of sight.`,'xp+m'),
+ c('Ask him to walk ahead of you.','WIS 11 survive',`He hesitates, curses under his breath and mutters something about "a prior engagement". The shortcut, you decide, was never real.`,'xp+l','He walks ahead cheerfully. You follow, wary, and, in the end, nothing happens.','xp+s')),
+L('any','The Roadside Stew','🍲',`A woman is serving stew from a huge black pot at a crossroads. "Free for travellers!" she calls. "Plenty for all! Thick as sin and twice as good." It smells wonderful, and a few drowsy-looking men are sitting by the verge.`,
+ o('Take a bowl and eat.',`Hot, rich and savoury. Everyone is smiling.`,'xp+s hp+m','',RK(40,'Halfway down the bowl, your stomach cramps and your vision wobbles. You have been poisoned, and the woman, and the pot, have disappeared by the time you look up.','st:poison3')),
+ o('Politely decline and walk on.',`She shrugs. "More for the rest." You walk on, a little hungry, and a little wiser.`,'xp+s'),
+ c('Watch the others for a while before deciding.','WIS 11 survive',`The "free" stew sends two travellers off to sleep very quickly. You quietly move on.`,'xp+l','Everyone seems fine, so far. You eat your own bread to be careful.','xp+s')),
+L('any','A Bargain Blade','⚔️',`A smiling peddler in a pointed hat holds up a long, shining sword. "A knight's blade! Only thirty gold! A real bargain, friend. Was meant for a lord, but he, ah, no longer needs it."`,
+ o('Buy the sword (30 gold).',`The blade is beautiful, perfectly balanced and, oddly, a little too warm.`,'gold-30 xp+s','gold:30',RK(45,'The first time you draw it, the blade whispers in a dead tongue. Something cold settles on your shoulders, and a curse tightens round you.','st:curse3')),
+ o('Politely decline.',`"Your loss," he sniffs, and wraps it back up.`,'xp+s'),
+ c('Examine the blade for runes.','INT 11 lore',`There, on the tang: a tiny cursed sigil. You put it back and walk away, heart pounding.`,'xp+l','The metal is flawless. You are suspicious, but unable to say why.','xp+s')),
+L('any','The Hedge-Witch\'s Tea','🍵',`An old woman in a patched shawl waves from a tiny hut. "Come in, dear! A cup of my special tea for the weary. No charge. It will do you a world of good." The kettle is already steaming.`,
+ o('Drink the tea.',`It is hot, bitter and faintly sweet, with a strange herbal taste.`,'xp+s','',RK(40,'It does good for some, and harm for others. Today, you are one of the others, and the world spins.','st:poison3')),
+ o('Politely decline, and ask for water.',`She cackles. "Clever one." She hands you a plain cup of water, and a small, knowing smile.`,'xp+m'),
+ c('Ask what is in it.','WIS 11 survive',`She lists nine herbs, and, as she does, you recognise two that are a little too dangerous. You smile, and decline.`,'xp+l','She recites a list that sounds harmless. You drink a little, carefully.','xp+s st:bless2')),
+L('any','A Limping Traveller','🧳',`A man sits at the roadside, clutching his ankle, wincing. "Twisted it! Please, kind stranger, would you help me up and carry my pack to the next village? My purse for the trouble."`,
+ o('Help him up and carry his pack.',`He leans on you, groaning, and you take the pack.`,'xp+s mp+s','',RK(30,'The ankle is miraculously better. A whistle sounds, and two friends step from the hedge. By the time you get away, you are lighter in gold and a few useful things.','hp-m loseitem gold-s')),
+ o('Offer him some bread, and point out the road to the village.',`He accepts it with a grumble, and hobbles on his own.`,'xp+m mp+s flag:kind'),
+ c('Examine the ankle with a healer\'s eye.','WIS 11 heal',`There is no swelling. He is a liar. He mutters, scrambles up and bolts.`,'xp+l','It does look swollen. You do what you can, and stay alert.','xp+s')),
+L('any','The Wishing Well','⛲',`An old stone well stands at a crossroads, with coins glinting in the shallows and a little sign: "Toss a coin and wish. Your fortune awaits." A beggar sits nearby, watching.`,
+ o('Toss in a coin (10 gold) and wish for luck.',`Plink. You close your eyes, and wish.`,'gold-10 xp+s mp+s','gold:10',RK(50,'The beggar slips round the back, scoops the whole well into his hat and is gone before the ripples settle. Your wish, apparently, was for him.','mp-s')),
+ o('Wish silently, without a coin.',`A free wish is still a wish. You walk on lighter.`,'xp+s mp+s'),
+ o('Give the beggar a copper instead.',`He nods, and says nothing, which is enough.`,'gold-1 xp+m mp+s flag:kind','gold:1')),
+L('any','Free Mushrooms','🍄',`A small, hungry-looking boy sells strange mushrooms from a basket. "Fresh from the forest, sir! Safe to eat! Very tasty! Only five gold!" Nobody is buying.`,
+ o('Buy a bunch and eat them (5 gold).',`They are earthy, rubbery and slightly peppery.`,'gold-5 hp+s xp+s','gold:5',RK(35,'Within the hour, you are racked with a terrible fever. The mushrooms were far from safe.','st:poison3')),
+ o('Buy bread from him instead (3 gold).',`He looks surprised, and delighted. The bread is a little stale, but perfectly safe.`,'gold-3 hp+s xp+m','gold:3'),
+ o('Decline kindly, and move on.',`He shrugs, and calls out to the next passer-by.`,'xp+s'))
+]);
+
+/* ---------- where the traps appear ---------- */
+['cg_tampines','cg_changi','cg_city','cg_eastcoast','cg_ubin','cg_festival','cg_oldcity','cg_nature'].forEach(r => { if (G.regions[r]) G.regions[r].enc.cg_trick = 2; });
+['gr_shore','gr_athens','gr_delphi','gr_sea'].forEach(r => { if (G.regions[r]) G.regions[r].enc.gr_trick = 2; });
+['gr_gorgon','gr_forge','gr_hades','gr_olympus'].forEach(r => { if (G.regions[r]) G.regions[r].enc.gr_trick = 1; });
+['greenmarch','stonehelm','gloamfen','amber','saltwind','frostmere','hollowdeep','ashen'].forEach(r => { if (G.regions[r]) G.regions[r].enc.roadtrick = 1.5; });
+
+/* ================= street food and shop bargains can go wrong too ================= */
+const FOOD = /(order|eat|gelato|pasta|nasi|noodle|rojak|satay|stingray|chendol|popiah|kueh|kopi|teh|juice|bowl|plate|snack|drink|cup of|stew|cake|figs|bread|olives|wine|honey|cornetto|meal|lunch|dinner|fish on a stick|ice)/i;
+const sick = (p, msg) => [p, msg || 'Something in it does not agree with you. An unhappy hour later, you wish you had stuck to plain rice.', 'hp-3 mp-3'];
+const riskPool = (poolName, titleRe, labelRe, risk) => { (G.mini[poolName]||[]).forEach(e => { if (titleRe && !titleRe.test(e[1])) return; e[4].forEach(a => { if (!a[8] && /gold:/.test(a[6]||'') && (!labelRe || labelRe.test(a[0]))) a[8] = risk; }); }); };
+riskPool('cg_food', null, null, sick(18));
+riskPool('cg_local', /Seafood|Joo Chiat|Geylang|Kueh|Popiah|Chendol|Hawker|Pasar|Satay/i, FOOD, sick(22));
+riskPool('cg_action', null, /fishballs|bubble tea|noodle/i, sick(15));
+riskPool('gr_shop', /Stall|Offering|Boatman/i, /(cake|figs|wine)/i, sick(20, 'The food was a day older than the stallholder admitted. You pay for it all afternoon.'));
+riskPool('gr_local', null, FOOD, sick(15));
+riskPool('toll', /Camp Cook/, null, [20, 'The stew was not as fresh as it smelled. By nightfall you are doubled over, feverish and miserable.', 'st:poison3']);
+riskPool('toll', /Apothecary/, null, [15, 'Back on the road, you find the "potion" is little more than coloured water. Your gold bought you nothing.', 'xp+s']);
+riskPool('toll', /Guide for Hire/, /Hire her/, [20, 'She leads you to the right path, and then to a "friend\'s" roadside stall where you are asked, rather firmly, to pay for a lot of things you never ordered.', 'gold-s']);
+riskPool('toll', /Gate Guard/, /Slip him/, [15, 'He takes the gold, and then, with a straight face, tells you the gates are closed anyway. Your pocket is lighter.', 'mp-s']);
+
+/* the same treatment for food and drink in the hand-written scenes of both new stories */
+Object.keys(G.scenes).filter(id => /^(cg|gr)/.test(id)).forEach(id => { (G.scenes[id].opts || []).forEach(o2 => { if (!o2.risk && /gold:\d/.test(o2.r||'') && FOOD.test(o2.t||'') && !o2.act) o2.risk = sick(14); }); });
+
+/* shops that sell useful things can sell duds */
+['cg_stall_a','cg_stall_b'].forEach(sid => { ((G.scenes[sid]||{}).opts || []).forEach(o2 => { const m = /\+(cg_[a-z_]+)/.exec((o2.y && o2.y[1]) || ''); if (m && /cg_(joss|salt|battery)/.test(m[1])) o2.risk = [15, 'Back at the beach you find the "fresh" stock was damp and useless. It crumbles to nothing in your hand.', '-' + m[1]]; }); });
+const seed = (sid, textRe, risk) => { ((G.scenes[sid]||{}).opts || []).forEach(o2 => { if (!o2.risk && textRe.test(o2.t||'')) o2.risk = risk; }); };
+seed('gr2_inn', /Order bread/, sick(15, 'The cheese was older than the innkeeper let on.'));
+seed('gr2_inn', /Sleep in the barn/, [25, 'You wake before dawn to find your purse lighter, and a sack of your things missing. A thief, or a very hungry goat.', 'gold-5 loseitem']);
+seed('gr3_agora', /buy food/i, sick(15));
+seed('cg2_bus', /taxi|cab/i, [10, 'The driver takes the long way round, and the meter runs on happily.', 'gold-3']);
+})();
+
+</script>
+<script>
 /* UI: rendering, narration (speech synthesis), number-pad input, save/load */
 (function(){
 const G = globalThis.G;
@@ -8221,7 +8435,7 @@ function setHeader(){
   $('#mpbar').style.width = Math.max(0,S.mp/S.maxMp*100)+'%'; $('#mptxt').textContent = `${mpL()} ${S.mp} / ${S.maxMp}`;
   $('#xpbar').style.width = (S.lvl>=20?100:S.xp/G.xpNeed(S.lvl)*100)+'%'; $('#xptxt').textContent = `Lv ${S.lvl}  ·  XP ${S.lvl>=20?'MAX':S.xp+'/'+G.xpNeed(S.lvl)}`;
   const st = Object.keys(S.status).filter(k=>S.status[k]>0).map(k=>({poison:'☠',bless:'✨',curse:'💀'})[k]).join('');
-  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${C.n}</span><span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span><span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>${st?`<span class="chip">${st}</span>`:''}`;
+  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${C.n}</span><span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span><span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>${st?`<span class="chip">${st}</span>`:''}${S.insight>0?`<span class="chip" title="A sharp mind: one wrong answer is ruled out in the next question">💡 Insight <b>${S.insight}</b></span>`:''}`;
 }
 function renderRight(){
   const R = $('#rbody'); if (!R) return;
@@ -8279,7 +8493,7 @@ function renderScreen(sc, opts){
   const av = sc.opts.filter(o=>o.avail), lk = sc.opts.filter(o=>!o.avail);
   let oh = '';
   av.forEach((o,i) => { const meta = [];
-    if (o.mp) meta.push(`<span class="m mp">✦ −${o.mp} MP</span>`);
+    if (o.mp) meta.push(`<span class="m mp">✦ −${o.mp} ${esc(mpL())}</span>`);
     const rl = reqLabel(o); if (rl) meta.push(`<span class="m">${esc(rl)}</span>`);
     if (o.safe && !o.chk && !rl) meta.push('');
     oh += `<button class="opt" data-i="${i}"><span class="key">${i+1}</span><span class="lbl">${o.html||esc(o.label)}</span><span class="meta">${meta.join('')}</span></button>`; });

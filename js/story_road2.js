@@ -62,24 +62,24 @@ sc('r4_sphinx','desert|🦁 🏛️',
  {t:`Sneak past while she yawns.`,c:'DEX 15 sneak',y:[`A paw-length at a time. You ease past her great flank, and the Company creeps behind. She snores. You breathe again.`,'xp+l'],n:[`A single huge eye opens. "Mmm," says the sphinx. "*Questions*."`,'flag:sphinx_angry >r4_sphinx_q1']},
  {t:`Find another route, even if it takes a week.`,y:[`A long, dry, labyrinthine detour round the canyon. A week of heat, but nobody gets eaten.`,'xp+m hp-m']} ]);
 sc('r4_sphinx_q1','desert|🦁 🧩',`"What has roots as nobody sees, is taller than trees, up, up it goes, and yet never grows?"`,[
- {t:`"A mountain."`,y:[`"Correct." The sphinx's eyes narrow. "Hmm." She tilts her head. "Second question."`,'xp+m >r4_sphinx_q2']},
- {t:`"A tall tree."`,y:[`"Wrong, but not by much." A paw swipes, razor claws grazing your arm. "Second question."`,'hp-m flag:sphinx_angry >r4_sphinx_q2']},
- {t:`"The wind."`,y:[`"Wrong." A paw swipes, and you are slammed against the rock. "Second question."`,'hp-m flag:sphinx_angry >r4_sphinx_q2']},
+ {t:`"A mountain."`,y:[`"Correct." The sphinx's eyes narrow. "Hmm." She tilts her head. "Second question."`,'xp+m quiz+ >r4_sphinx_q2']},
+ {t:`"A tall tree."`,y:[`"Wrong, but not by much." A paw swipes, razor claws grazing your arm. "Second question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q2']},
+ {t:`"The wind."`,y:[`"Wrong." A paw swipes, and you are slammed against the rock. "Second question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q2']},
  {t:`"I don't know. But I'll find out."`,y:[`"Honest." The sphinx tilts her head. "A cheap answer, but a true one. Second question."`,'xp+m flag:sphinx_angry >r4_sphinx_q2']} ]);
 sc('r4_sphinx_q2','desert|🦁 🧩',`"Alive without breath, as cold as death; never thirsty, ever drinking; all in mail, never clinking. What am I?"`,[
- {t:`"A fish."`,y:[`"Correct." The sphinx's tail twitches. "Third question."`,'xp+m >r4_sphinx_q3']},
- {t:`"A knight in armour."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A paw knocks you flat, but you roll aside. "Third question."`,'hp-l flag:sphinx_angry >r4_sphinx_q3']},
- {t:`"A knight in armour."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong, wrong, WRONG." The sphinx's great jaws open, a cavern of teeth. The canyon fills with her roar, and the last thing you see is the roof of her mouth.`,'die']},
- {t:`"A ghost."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A swat. "Third question."`,'hp-l flag:sphinx_angry >r4_sphinx_q3']},
- {t:`"A ghost."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong." The sphinx pounces. It is very fast, and very final.`,'die']},
- {t:`Ask for a hint.`,c:'CHA 13 persuade',y:[`"Hmph." The sphinx sniffs. "It swims." A slow wink. "Answer."`,'xp+m >r4_sphinx_q2'],n:[`"No hints." A swipe.`,'hp-m flag:sphinx_angry >r4_sphinx_q2']},
+ {t:`"A fish."`,y:[`"Correct." The sphinx's tail twitches. "Third question."`,'xp+m quiz+ >r4_sphinx_q3']},
+ {t:`"A knight in armour."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A paw knocks you flat, but you roll aside. "Third question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q3']},
+ {t:`"A knight in armour."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong, wrong, WRONG." The sphinx's jaws open, and her roar flattens you against the rock. Ears ringing, you are shaken but unharmed. "Third question."`,'hp-l xp+s quiz- >r4_sphinx_q3']},
+ {t:`"A ghost."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." A swat. "Third question."`,'xp+s quiz- flag:sphinx_angry >r4_sphinx_q3']},
+ {t:`"A ghost."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong." The sphinx pounces and pins you flat with one great paw, thinks better of it and lets go. "Third question."`,'hp-l xp+s quiz- >r4_sphinx_q3']},
+ {t:`Ask for a hint.`,hide:true,r:'!flag:sphinx_hint',c:'CHA 13 persuade',y:[`"Hmph." The sphinx sniffs. "It swims." A slow wink. "Answer."`,'xp+m flag:sphinx_hint >r4_sphinx_q2'],n:[`"No hints." A swipe.`,'xp+s quiz- flag:sphinx_angry flag:sphinx_hint >r4_sphinx_q2']},
  {t:`Admit you cannot answer, and bow your head.`,y:[`"Honest," says the sphinx, sniffing. A paw taps you, not unkindly. "Third question."`,'hp-1 flag:sphinx_angry >r4_sphinx_q3']} ]);
 sc('r4_sphinx_q3','desert|🦁 🧩',`"Last, and I think hardest. I hold the dead, the living and the not yet born. I have no end and no beginning. Every one of you will leave me, but none can stay. What am I?"`,[
- {t:`"Time."`,y:[`A long silence. The sphinx's copper eyes soften. "Time," she says, quietly. "Yes." She stands, stretches, and steps aside. "Go. And take this, for I have not been asked a good question in a thousand years."`,'xp+xl loot:trink flag:sphinx_friend'.replace('xp+xl','xp+l')]},
+ {t:`"Time."`,y:[`A long silence. The sphinx's copper eyes soften. "Time," she says, quietly. "Yes." She stands, stretches, and steps aside. "Go. And take this, for I have not been asked a good question in a thousand years."`,'xp+xl loot:trink flag:sphinx_friend quiz+'.replace('xp+xl','xp+l')]},
  {t:`"Memory."`,hide:true,r:'!flag:sphinx_angry',y:[`"Almost." The sphinx tilts her head. "Almost is not enough. But you amuse me. Go." She wafts a paw.`,'xp+l hp-s']},
- {t:`"Memory."`,hide:true,r:'flag:sphinx_angry',y:[`"Almost," says the sphinx. "But I am hungry." The Company screams.`,'die']},
+ {t:`"Memory."`,hide:true,r:'flag:sphinx_angry',y:[`"Almost," says the sphinx. "But I am hungry." She pins you flat with one paw, sniffs, and sighs. "...Go."`,'hp-l xp+s quiz-']},
  {t:`"Death."`,hide:true,r:'!flag:sphinx_angry',y:[`"Wrong." She swipes. "But you've had two right, and I'm bored. Go."`,'hp-l xp+m']},
- {t:`"Death."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong. Oh, so wrong." There's a very quiet, very final crunch.`,'die']},
+ {t:`"Death."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong. Oh, so wrong." A paw the size of a cartwheel pushes you across the sand. "Go, before I change my mind."`,'hp-l xp+s quiz-']},
  {t:`Admit defeat and ask for mercy.`,y:[`"Hm." The sphinx studies you. "A coward's answer — but a living one." A lazy paw sweeps you aside. "Go."`,'hp-2 xp+s']},
  {t:`"Love."`,hide:true,r:'!flag:sphinx_angry',y:[`A pause. The sphinx's eyes widen. "No," she says, softly. "But..." Her voice trails. "Go. I will think about that for a century."`,'xp+l hp-s']},
  {t:`"Love."`,hide:true,r:'flag:sphinx_angry',y:[`"Wrong," says the sphinx. But she doesn't pounce. She sits very still, and a tear runs down her golden cheek. "Go," she says. "Before I change my mind."`,'xp+l hp-m']} ]);

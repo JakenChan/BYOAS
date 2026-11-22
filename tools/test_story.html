@@ -1,6 +1,6 @@
 <!doctype html><meta charset="utf-8"><title>story test</title>
 <body style="font:12px monospace;background:#111;color:#ddd;white-space:pre-wrap" id="out">running…
-<script>['engine', 'data_core', 'art', 'art_gr', 'regions', 'encounters', 'mini', 'story_act1', 'story_act2', 'story_act3', 'story_road1', 'story_road2', 'story_road3', 'story_finale', 'titles', 'data_cg', 'data_cg2', 'mini_cg', 'mini_cg2', 'data_gr', 'mini_gr', 'story_cg1', 'story_cg2', 'story_cg3', 'story_cg4', 'story_cg5', 'story_cg6', 'story_cg7', 'cg_risks', 'story_triggers', 'ashen_polish', 'story_gr1', 'story_gr2', 'story_gr3', 'gr_polish', 'stakes_gr', 'cg_order', 'story_cg8', 'stakes_cg'].forEach(f=>document.write('<scr'+'ipt src="../js/'+f+'.js?t='+Date.now()+'"></scr'+'ipt>'));</script>
+<script>['engine', 'data_core', 'art', 'art_gr', 'regions', 'encounters', 'mini', 'story_act1', 'story_act2', 'story_act3', 'story_road1', 'story_road2', 'story_road3', 'story_finale', 'titles', 'data_cg', 'data_cg2', 'mini_cg', 'mini_cg2', 'data_gr', 'mini_gr', 'story_cg1', 'story_cg2', 'story_cg3', 'story_cg4', 'story_cg5', 'story_cg6', 'story_cg7', 'cg_risks', 'story_triggers', 'ashen_polish', 'story_gr1', 'story_gr2', 'story_gr3', 'gr_polish', 'stakes_gr', 'tricks', 'cg_order', 'story_cg8', 'stakes_cg'].forEach(f=>document.write('<scr'+'ipt src="../js/'+f+'.js?t='+Date.now()+'"></scr'+'ipt>'));</script>
 <script>
 const out=[]; const log=s=>out.push(s);
 const params=new URLSearchParams(location.search); const NSIM=+(params.get('n')||40); const MODE=params.get('mode')||'all'; const STORY=params.get('story')||'ashen'; const NOEARLY=params.get('noearly')==='1';
@@ -31,8 +31,8 @@ function validate(){
     let hasSafe=false;
     (def.opts||[]).forEach((o,i)=>{ const w=where+' opt'+(i+1);
       checkReq(o.r,w); if(o.c && !/^(STR|DEX|CON|INT|WIS|CHA) \d+ \w+$/.test(o.c)) E(w+' bad check '+o.c);
-      if(o.y){ fxRun(o.y[1],w+'.y'); } if(o.n){ fxRun(o.n[1],w+'.n'); }
-      if(G.isSafe(o)) hasSafe=true; if(o.act) hasSafe=true; });
+      if(o.y){ fxRun(o.y[1],w+'.y'); } if(o.n){ fxRun(o.n[1],w+'.n'); } if(o.risk){ fxRun(o.risk[2],w+'.risk'); if(typeof o.risk[0]!=='number') E(w+' bad risk'); }
+      if(G.isSafe(o) && !o.risk) hasSafe=true; if(o.act) hasSafe=true; });
     if(!def.card && !hasSafe && !def.end) E(where+' has no safe option');
     try{ const T=JSON.parse(JSON.stringify(S0)); T.items=Object.assign({},S0.items); T.cur={kind:'static',id}; G.resolveCur(T); }catch(e){ E(where+' resolve: '+e.message); }
   };
@@ -43,8 +43,8 @@ function validate(){
   // ally talks
   Object.keys(G.talks).forEach(a=>{ if(!G.allies[a]) E('talk for unknown ally '+a); G.talks[a].forEach((t,i)=>{ [t.k,t.j,t.p].forEach(x=>{ if(!x||x.length<2) E('talk '+a+i+' malformed'); }); if(t.p&&t.p[2]) fxRun(t.p[2],'talk '+a+i); }); });
   // mini pools
-  Object.keys(G.mini).forEach(n=>{ G.mini[n].forEach((e,i)=>{ const w='mini '+n+'#'+i+' '+e[1]; if(e.length<5) E(w+' malformed'); const safe=e[4].some(a=>!a[1]&&!a[6]&&!a[7]&&!/die|hp-[lm]/.test((a[3]||''))); if(!safe) E(w+' no safe option');
-      e[4].forEach((a,k)=>{ checkReq(a[6],w+' opt'+(k+1)); if(a[1]&&!/^(STR|DEX|CON|INT|WIS|CHA) \d+ \w+$/.test(a[1])) E(w+' bad check '+a[1]); fxRun(a[3],w+'.y'+k); fxRun(a[5],w+'.n'+k); }); }); });
+  Object.keys(G.mini).forEach(n=>{ G.mini[n].forEach((e,i)=>{ const w='mini '+n+'#'+i+' '+e[1]; if(e.length<5) E(w+' malformed'); const safe=e[4].some(a=>!a[1]&&!a[6]&&!a[7]&&!a[8]&&!/die|hp-[lm]/.test((a[3]||''))); if(!safe) E(w+' no safe option');
+      e[4].forEach((a,k)=>{ checkReq(a[6],w+' opt'+(k+1)); if(a[1]&&!/^(STR|DEX|CON|INT|WIS|CHA) \d+ \w+$/.test(a[1])) E(w+' bad check '+a[1]); fxRun(a[3],w+'.y'+k); fxRun(a[5],w+'.n'+k); if(a[8]) fxRun(a[8][2],w+'.risk'+k); }); }); });
   // foes
   Object.keys(G.foes).forEach(f=>{ const F=G.foes[f]; if(!F.lv||!F.n||!F.intro) E('foe '+f+' incomplete'); if(F.win) fxRun(F.win,'foe '+f); });
   // regions
