@@ -12,6 +12,7 @@ const FAST = Math.max(1, +(new URLSearchParams(location.search).get('bedfast') |
 G.bedStory = (id, def) => {
   DEF[id] = def; NODES[id] = def.nodes;
   G.story(id, { title:def.title, icon:def.icon, art:def.art, tag:def.tag, desc:def.desc, intro:def.intro, bedtime:true, defName:'Dreamer' });
+  /* optional: def.music(F) -> {mood, world} for the background music; def.askWait seconds; def.endCode(F), def.endTotal and def.endNoun to count the different tellings heard */
 };
 G.bedNodes = NODES;
 
@@ -66,15 +67,18 @@ function play(units, from, done){
 
 /* ---------- screens ---------- */
 function frame(node, F){
-  UI.setArt(node.art || DEF[st.id].art, st.id + '|' + st.node, node.title || DEF[st.id].title, '');
+  const fv = v => typeof v === 'function' ? v(st.F) : v;
+  UI.setArt(fv(node.art) || DEF[st.id].art, st.id + '|' + st.node, fv(node.title) || DEF[st.id].title, '');
 }
 function chrome(extra){
-  return `<div class="bedctl">${extra||''}<button class="bb" id="bbPause">⏸ Pause</button><button class="bb" id="bbDim">🌙 Dim</button><button class="bb" id="bbMute">${UI.SP.on?'🔊 Voice on':'🔇 Voice off'}</button></div>` +
-    `<div class="hint"><span class="kbhint">Space pause or resume · <b>M</b> voice on/off · <b>D</b> dim the screen · <b>+</b>/<b>−</b> speed · <b>Esc</b> menu</span><span class="tchint">Tap Pause to stop for a moment, Dim to darken the screen.</span></div>`;
+  const mus = DEF[st.id].music ? `<button class="bb" id="bbMusic">${G.ambient.enabled?'🎵 Music on':'🔈 Music off'}</button>` : '';
+  return `<div class="bedctl">${extra||''}<button class="bb" id="bbPause">⏸ Pause</button><button class="bb" id="bbDim">🌙 Dim</button><button class="bb" id="bbMute">${UI.SP.on?'🔊 Voice on':'🔇 Voice off'}</button>${mus}</div>` +
+    `<div class="hint"><span class="kbhint">Space pause or resume · <b>M</b> voice on/off${DEF[st.id].music?' · <b>N</b> music on/off · <b>[</b> <b>]</b> music volume':''} · <b>D</b> dim the screen · <b>+</b>/<b>−</b> speed · <b>Esc</b> menu</span><span class="tchint">Tap Pause to stop for a moment, Dim to darken the screen.</span></div>`;
 }
 function wireChrome(){
   const p = $('#bbPause'); if (p) p.onclick = togglePause;
   const d = $('#bbDim'); if (d) d.onclick = toggleDim;
+  const mu = $('#bbMusic'); if (mu) mu.onclick = () => { const on = G.ambient.toggle(); mu.textContent = on ? '🎵 Music on' : '🔈 Music off'; };
   const m = $('#bbMute'); if (m) m.onclick = () => { UI.SP.on = !UI.SP.on; UI.LS.set('aq_voice_on', UI.SP.on ? '1' : '0'); if (!UI.SP.on) UI.stopSpeech(); UI.updateVoiceBtns(); B.voiceChanged(); m.textContent = UI.SP.on ? '🔊 Voice on' : '🔇 Voice off'; };
 }
 function togglePause(){
@@ -98,7 +102,7 @@ function paras(N){ const t = typeof N.text === 'function' ? N.text(st.F) : N.tex
 function showText(N){
   save(); frame(N);
   const b = build(paras(N)); const s = $('#story');
-  s.innerHTML = `<div class="scene bedscene">${N.head ? `<p class="bhead">${UI.esc(N.head)}</p>` : ''}${b.html}</div>`; s.scrollTop = 0;
+  s.innerHTML = `<div class="scene bedscene">${N.head ? `<p class="bhead">${UI.esc(typeof N.head === 'function' ? N.head(st.F) : N.head)}</p>` : ''}${b.html}</div>`; s.scrollTop = 0;
   bindEls(b.units);
   $('#opts').innerHTML = N.end ? '' : chrome(); if (!N.end) wireChrome();
   UI.setCUR({ opts:[] });
@@ -127,7 +131,7 @@ function showAsk(N){
 B.reread = () => { if (st && st.ask && curUnits.length) play(curUnits, 0, () => countdown(st.ask)); };
 
 function countdown(N){
-  let left = Math.ceil(ASK_WAIT / (FAST > 1 ? 10 : 1)); const bar = $('#dicebar'); const tick = () => { if (bar) bar.innerHTML = `🎲 Take your time. If you do not choose, the dice will decide in <b>${left}</b> seconds.`; };
+  let left = Math.ceil((DEF[st.id].askWait || ASK_WAIT) / (FAST > 1 ? 10 : 1)); const bar = $('#dicebar'); const tick = () => { if (bar) bar.innerHTML = `🎲 Take your time. If you do not choose, the dice will decide in <b>${left}</b> seconds.`; };
   tick(); if (askT) clearInterval(askT);
   askT = setInterval(() => { if (paused) return; left--; tick(); if (left <= 0){ clearInterval(askT); askT = null; rollDice(N); } }, 1000);
 }
@@ -142,6 +146,7 @@ function choose(i, byDice){
   if (!st || !st.ask) return; const N = st.ask; const o = N.opts[i]; if (!o) return;
   st.ask = null; clearTimers(); UI.stopSpeech(); tok++;
   st.F[N.flag] = o.v; st.F.last = o.v; (st.trail = st.trail || []).push(o.v);
+  if (DEF[st.id].music) G.ambient.set(DEF[st.id].music(st.F));
   if (o.set) Object.assign(st.F, o.set);
   UI.LS.set('aq_bed_log_' + st.id, JSON.stringify(st.trail));
   go(typeof o.to === 'function' ? o.to(st.F) : o.to);
@@ -149,9 +154,11 @@ function choose(i, byDice){
 
 function finish(N){
   st.over = true; UI.LS.del(key(st.id));
-  const seen = seenEnds(st.id); if (!seen.includes(st.node)){ seen.push(st.node); UI.LS.set(endKey(st.id), JSON.stringify(seen)); }
-  const total = nEnds(st.id);
-  const s = $('#story'); s.insertAdjacentHTML('beforeend', `<div class="scene bedscene"><p class="bhead">${UI.esc(N.end)}</p><p class="bp dim">You have now found ${seen.length} of ${total} different endings.</p></div>`);
+  const D = DEF[st.id]; const code = D.endCode ? D.endCode(st.F) : st.node;
+  const seen = seenEnds(st.id); if (!seen.includes(code)){ seen.push(code); UI.LS.set(endKey(st.id), JSON.stringify(seen)); }
+  const total = D.endTotal || nEnds(st.id); const noun = D.endNoun || 'endings'; const endName = typeof N.end === 'function' ? N.end(st.F) : N.end;
+  const s = $('#story'); s.insertAdjacentHTML('beforeend', `<div class="scene bedscene"><p class="bhead">${UI.esc(endName)}</p><p class="bp dim">You have now found ${seen.length} of ${total} different ${noun}.</p></div>`);
+  if (D.music) setTimeout(() => { if (!st || st.over) G.ambient.stop(); }, 30000);
   $('#opts').innerHTML = `<button class="opt" data-i="0"><span class="key">1</span><span class="lbl">Hear the story again, and choose differently</span></button><button class="opt" data-i="1"><span class="key">2</span><span class="lbl">Back to the story library</span></button>`;
   const again = () => B.start(st.id, false), lib = () => UI.toTitle();
   const els = $('#opts').querySelectorAll('button.opt'); els[0].onclick = again; els[1].onclick = lib;
@@ -179,9 +186,11 @@ B.start = (id, resume) => {
   if (resume){ try { const j = JSON.parse(UI.LS.get(key(id)) || 'null'); if (j && NODES[id][j.n]){ st.node = j.n; st.F = j.F || {}; } } catch(e){} }
   else UI.LS.del(key(id));
   const side = $('#rbody'); if (side) side.innerHTML = '';
-  clock(); getWake(); go(st.node);
+  clock(); getWake();
+  if (def.music && G.ambient){ G.ambient.start(def.music(st.F)); }
+  go(st.node);
 };
-B.stop = () => { clearTimers(); tok++; if (clockT){ clearInterval(clockT); clockT = null; } UI = UI || window.AQ_UI; if (UI){ UI.SP.mult = 1; UI.SP.pitch = 0.95; } document.body.classList.remove('bed', 'dim'); st = null; releaseWake(); };
+B.stop = () => { clearTimers(); tok++; if (clockT){ clearInterval(clockT); clockT = null; } UI = UI || window.AQ_UI; if (UI){ UI.SP.mult = 1; UI.SP.pitch = 0.95; } document.body.classList.remove('bed', 'dim'); st = null; releaseWake(); if (G.ambient) G.ambient.stop(); };
 B.skip = () => { if (!st) return; if (st.ask){ return; } paused = false; tok++; UI.stopSpeech(); const N = NODES[st.id][st.node]; if (N && !N.end) go(typeof N.next === 'function' ? N.next(st.F) : N.next); };
 B.voiceChanged = () => {
   if (!st || st.over || !curUnits.length) return;
@@ -195,6 +204,8 @@ B.onKey = e => {
   if (k === ' ' || e.code === 'NumpadDecimal' || (k === 'enter' && !st.over)){ e.preventDefault(); if (!st.over) togglePause(); return true; }
   if (k === 'm'){ UI.SP.on = !UI.SP.on; UI.LS.set('aq_voice_on', UI.SP.on ? '1' : '0'); if (!UI.SP.on) UI.stopSpeech(); UI.updateVoiceBtns(); B.voiceChanged(); const m = $('#bbMute'); if (m) m.textContent = UI.SP.on ? '🔊 Voice on' : '🔇 Voice off'; return true; }
   if (k === 'd'){ toggleDim(); return true; }
+  if (k === 'n' && DEF[st.id].music){ const on = G.ambient.toggle(); const mu = $('#bbMusic'); if (mu) mu.textContent = on ? '🎵 Music on' : '🔈 Music off'; UI.toast(on ? 'Music on' : 'Music off'); return true; }
+  if ((k === '[' || k === ']') && DEF[st.id].music){ const v = G.ambient.volume(k === ']' ? .1 : -.1); UI.toast('Music volume ' + Math.round(v * 100) + '%'); return true; }
   if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd'){ UI.SP.rate = Math.min(1.6, UI.SP.rate + .05); UI.LS.set('aq_rate', UI.SP.rate); UI.toast('Voice speed ' + UI.SP.rate.toFixed(2)); return true; }
   if (e.key === '-' || e.code === 'NumpadSubtract'){ UI.SP.rate = Math.max(.5, UI.SP.rate - .05); UI.LS.set('aq_rate', UI.SP.rate); UI.toast('Voice speed ' + UI.SP.rate.toFixed(2)); return true; }
   return false;

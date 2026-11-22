@@ -9747,6 +9747,110 @@ ALLY.sp_oko = [
 
 </script>
 <script>
+/* Soft background music, made live with the Web Audio API (no sound files needed).
+   A slow pad of chords, a low drone and a few gentle bell notes through a long, quiet reverb. */
+(function(){
+const G = globalThis.G;
+const A = G.ambient = {};
+let an = null, ctx = null, master = null, wet = null, delay = null, running = false, timers = [], P = null, vol = 0.5, chordNo = 0;
+
+const LS = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+vol = Math.max(0, Math.min(1, parseFloat(LS.get('aq_music_vol') || '0.5')));
+A.enabled = LS.get('aq_music_on') !== '0';
+
+/* moods: a key (semitones above middle C), four chords (semitone offsets from the key) and a scale for the bell notes */
+const MOODS = {
+  joy:    { key: 7,  chords: [[0,4,7,11],[9,12,16,19],[5,9,12,16],[7,11,14,16]], scale: [0,2,4,7,9], gap: [2.5, 6], bpm: 1.0 },
+  calm:   { key: 2,  chords: [[0,7,12,16],[5,9,12,16],[-2,2,7,12],[0,7,12,14]],  scale: [0,2,4,7,9], gap: [4, 9],  bpm: 0.8 },
+  wonder: { key: 5,  chords: [[0,4,7,11],[2,6,9,14],[0,4,7,11],[4,7,11,14]],     scale: [0,2,4,6,7,9,11], gap: [3, 7], bpm: 0.9 },
+  tender: { key: 9,  chords: [[0,3,7,10],[-4,0,3,7],[5,8,12,15],[-2,2,5,9]],     scale: [0,3,5,7,10], gap: [3.5, 8], bpm: 0.85 }
+};
+/* timbres: how the bell notes sound, by kind of world */
+const TIMBRES = {
+  present: { type: 'triangle', decay: 3.2, oct: 0,  shimmer: 0 },
+  ancient: { type: 'triangle', decay: 2.2, oct: 0,  shimmer: 0 },
+  future:  { type: 'sine',     decay: 5.0, oct: 12, shimmer: 0.35 },
+  dream:   { type: 'sine',     decay: 4.2, oct: 12, shimmer: 0.2 }
+};
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const later = (fn, s) => { const t = setTimeout(fn, s * 1000); timers.push(t); };
+
+function reverb(){
+  const len = Math.floor(ctx.sampleRate * 4), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++){ const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+  const cv = ctx.createConvolver(); cv.buffer = buf; return cv;
+}
+function build(){
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+  an = ctx.createAnalyser(); an.fftSize = 1024; master.connect(an);
+  wet = ctx.createGain(); wet.gain.value = 0.9; const rv = reverb(); wet.connect(rv); rv.connect(master);
+  delay = ctx.createDelay(2); delay.delayTime.value = 0.62; const fb = ctx.createGain(); fb.gain.value = 0.32; delay.connect(fb); fb.connect(delay); delay.connect(wet);
+}
+function pad(notes, dur){
+  const t0 = ctx.currentTime; const g = ctx.createGain(); g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(0.5, t0 + dur * 0.38); g.gain.linearRampToValueAtTime(0.4, t0 + dur * 0.7); g.gain.linearRampToValueAtTime(0, t0 + dur * 1.35);
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 760; lp.Q.value = 0.3;
+  g.connect(lp); lp.connect(master); lp.connect(wet);
+  notes.forEach((m, i) => {
+    [[0, 'sine', 0.16], [6, 'triangle', 0.07], [-5, 'sine', 0.1]].forEach(([det, type, amp]) => {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = hz(m); o.detune.value = det;
+      const og = ctx.createGain(); og.gain.value = amp / Math.sqrt(notes.length);
+      const lfo = ctx.createOscillator(); lfo.frequency.value = rnd(0.05, 0.14); const lg = ctx.createGain(); lg.gain.value = 3; lfo.connect(lg); lg.connect(o.detune);
+      o.connect(og); og.connect(g); o.start(t0); lfo.start(t0); o.stop(t0 + dur * 1.4); lfo.stop(t0 + dur * 1.4);
+    });
+  });
+}
+function drone(m, dur){
+  const t0 = ctx.currentTime; const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = hz(m);
+  const g = ctx.createGain(); g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.1, t0 + dur * 0.4); g.gain.linearRampToValueAtTime(0, t0 + dur * 1.3);
+  o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur * 1.35);
+}
+function bell(m, tim){
+  const t0 = ctx.currentTime; const g = ctx.createGain(); const d = tim.decay;
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.11, t0 + 0.03); g.gain.exponentialRampToValueAtTime(0.0008, t0 + d);
+  g.connect(master); g.connect(wet); g.connect(delay);
+  const o = ctx.createOscillator(); o.type = tim.type; o.frequency.value = hz(m + tim.oct); o.connect(g); o.start(t0); o.stop(t0 + d + 0.1);
+  if (tim.shimmer){ const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = hz(m + tim.oct + 12) * 1.002; const g2 = ctx.createGain(); g2.gain.value = tim.shimmer; o2.connect(g2); g2.connect(g); o2.start(t0); o2.stop(t0 + d + 0.1); }
+}
+function cycle(){
+  if (!running) return;
+  const M = P.mood, key = 48 + M.key;                    /* chords sit low and warm */
+  const dur = 15 / M.bpm; const chord = M.chords[chordNo % M.chords.length]; chordNo++;
+  pad(chord.map(c => key + 12 + c), dur); drone(key - 12 + chord[0], dur);
+  later(cycle, dur * 0.82);
+}
+function sparkle(){
+  if (!running) return;
+  const M = P.mood, key = 60 + M.key; const n = M.scale[Math.floor(Math.random() * M.scale.length)];
+  bell(key + 12 + n + (Math.random() < 0.3 ? 12 : 0), P.tim);
+  later(sparkle, rnd(M.gap[0], M.gap[1]));
+}
+function level(){ if (master) master.gain.setTargetAtTime(A.enabled ? vol * 0.55 : 0, ctx.currentTime, 1.5); }
+
+/* opts: { mood:'joy'|'calm'|'wonder'|'tender', world:'present'|'ancient'|'future'|'dream' } */
+A.start = (opts) => {
+  opts = opts || {};
+  try {
+    if (!ctx) build();
+    if (ctx.state === 'suspended') ctx.resume();
+    P = { mood: MOODS[opts.mood] || MOODS.calm, tim: TIMBRES[opts.world] || TIMBRES.dream };
+    if (!running){ running = true; chordNo = 0; cycle(); later(sparkle, 3); }
+    level();
+  } catch(e){ running = false; }
+};
+A.set = (opts) => { if (!running) return A.start(opts); P = { mood: MOODS[(opts||{}).mood] || P.mood, tim: TIMBRES[(opts||{}).world] || P.tim }; };
+A.stop = () => { running = false; timers.forEach(clearTimeout); timers = []; if (master){ try{ master.gain.setTargetAtTime(0, ctx.currentTime, 0.8); }catch(e){} } };
+A.toggle = () => { A.enabled = !A.enabled; LS.set('aq_music_on', A.enabled ? '1' : '0'); if (ctx && ctx.state === 'suspended') ctx.resume(); level(); return A.enabled; };
+A.volume = (d) => { vol = Math.max(0.05, Math.min(1, vol + d)); LS.set('aq_music_vol', vol); level(); return vol; };
+A.isRunning = () => running;
+A.level = () => { if (!an) return 0; const d = new Float32Array(an.fftSize); an.getFloatTimeDomainData(d); let s = 0; for (let i = 0; i < d.length; i++) s += d[i] * d[i]; return Math.sqrt(s / d.length); };
+A.state = () => ({ running, enabled: A.enabled, vol, ctx: ctx && ctx.state });
+})();
+
+</script>
+<script>
 /* Soft night scenes for the bedtime story: low contrast, slow colours, a moon in almost every picture */
 (function(){
 const G = globalThis.G, K = G.artKit, W = K.W, H = K.H, f = K.f, glow = K.glow;
@@ -9803,6 +9907,7 @@ const FAST = Math.max(1, +(new URLSearchParams(location.search).get('bedfast') |
 G.bedStory = (id, def) => {
   DEF[id] = def; NODES[id] = def.nodes;
   G.story(id, { title:def.title, icon:def.icon, art:def.art, tag:def.tag, desc:def.desc, intro:def.intro, bedtime:true, defName:'Dreamer' });
+  /* optional: def.music(F) -> {mood, world} for the background music; def.askWait seconds; def.endCode(F), def.endTotal and def.endNoun to count the different tellings heard */
 };
 G.bedNodes = NODES;
 
@@ -9857,15 +9962,18 @@ function play(units, from, done){
 
 /* ---------- screens ---------- */
 function frame(node, F){
-  UI.setArt(node.art || DEF[st.id].art, st.id + '|' + st.node, node.title || DEF[st.id].title, '');
+  const fv = v => typeof v === 'function' ? v(st.F) : v;
+  UI.setArt(fv(node.art) || DEF[st.id].art, st.id + '|' + st.node, fv(node.title) || DEF[st.id].title, '');
 }
 function chrome(extra){
-  return `<div class="bedctl">${extra||''}<button class="bb" id="bbPause">⏸ Pause</button><button class="bb" id="bbDim">🌙 Dim</button><button class="bb" id="bbMute">${UI.SP.on?'🔊 Voice on':'🔇 Voice off'}</button></div>` +
-    `<div class="hint"><span class="kbhint">Space pause or resume · <b>M</b> voice on/off · <b>D</b> dim the screen · <b>+</b>/<b>−</b> speed · <b>Esc</b> menu</span><span class="tchint">Tap Pause to stop for a moment, Dim to darken the screen.</span></div>`;
+  const mus = DEF[st.id].music ? `<button class="bb" id="bbMusic">${G.ambient.enabled?'🎵 Music on':'🔈 Music off'}</button>` : '';
+  return `<div class="bedctl">${extra||''}<button class="bb" id="bbPause">⏸ Pause</button><button class="bb" id="bbDim">🌙 Dim</button><button class="bb" id="bbMute">${UI.SP.on?'🔊 Voice on':'🔇 Voice off'}</button>${mus}</div>` +
+    `<div class="hint"><span class="kbhint">Space pause or resume · <b>M</b> voice on/off${DEF[st.id].music?' · <b>N</b> music on/off · <b>[</b> <b>]</b> music volume':''} · <b>D</b> dim the screen · <b>+</b>/<b>−</b> speed · <b>Esc</b> menu</span><span class="tchint">Tap Pause to stop for a moment, Dim to darken the screen.</span></div>`;
 }
 function wireChrome(){
   const p = $('#bbPause'); if (p) p.onclick = togglePause;
   const d = $('#bbDim'); if (d) d.onclick = toggleDim;
+  const mu = $('#bbMusic'); if (mu) mu.onclick = () => { const on = G.ambient.toggle(); mu.textContent = on ? '🎵 Music on' : '🔈 Music off'; };
   const m = $('#bbMute'); if (m) m.onclick = () => { UI.SP.on = !UI.SP.on; UI.LS.set('aq_voice_on', UI.SP.on ? '1' : '0'); if (!UI.SP.on) UI.stopSpeech(); UI.updateVoiceBtns(); B.voiceChanged(); m.textContent = UI.SP.on ? '🔊 Voice on' : '🔇 Voice off'; };
 }
 function togglePause(){
@@ -9889,7 +9997,7 @@ function paras(N){ const t = typeof N.text === 'function' ? N.text(st.F) : N.tex
 function showText(N){
   save(); frame(N);
   const b = build(paras(N)); const s = $('#story');
-  s.innerHTML = `<div class="scene bedscene">${N.head ? `<p class="bhead">${UI.esc(N.head)}</p>` : ''}${b.html}</div>`; s.scrollTop = 0;
+  s.innerHTML = `<div class="scene bedscene">${N.head ? `<p class="bhead">${UI.esc(typeof N.head === 'function' ? N.head(st.F) : N.head)}</p>` : ''}${b.html}</div>`; s.scrollTop = 0;
   bindEls(b.units);
   $('#opts').innerHTML = N.end ? '' : chrome(); if (!N.end) wireChrome();
   UI.setCUR({ opts:[] });
@@ -9918,7 +10026,7 @@ function showAsk(N){
 B.reread = () => { if (st && st.ask && curUnits.length) play(curUnits, 0, () => countdown(st.ask)); };
 
 function countdown(N){
-  let left = Math.ceil(ASK_WAIT / (FAST > 1 ? 10 : 1)); const bar = $('#dicebar'); const tick = () => { if (bar) bar.innerHTML = `🎲 Take your time. If you do not choose, the dice will decide in <b>${left}</b> seconds.`; };
+  let left = Math.ceil((DEF[st.id].askWait || ASK_WAIT) / (FAST > 1 ? 10 : 1)); const bar = $('#dicebar'); const tick = () => { if (bar) bar.innerHTML = `🎲 Take your time. If you do not choose, the dice will decide in <b>${left}</b> seconds.`; };
   tick(); if (askT) clearInterval(askT);
   askT = setInterval(() => { if (paused) return; left--; tick(); if (left <= 0){ clearInterval(askT); askT = null; rollDice(N); } }, 1000);
 }
@@ -9933,6 +10041,7 @@ function choose(i, byDice){
   if (!st || !st.ask) return; const N = st.ask; const o = N.opts[i]; if (!o) return;
   st.ask = null; clearTimers(); UI.stopSpeech(); tok++;
   st.F[N.flag] = o.v; st.F.last = o.v; (st.trail = st.trail || []).push(o.v);
+  if (DEF[st.id].music) G.ambient.set(DEF[st.id].music(st.F));
   if (o.set) Object.assign(st.F, o.set);
   UI.LS.set('aq_bed_log_' + st.id, JSON.stringify(st.trail));
   go(typeof o.to === 'function' ? o.to(st.F) : o.to);
@@ -9940,9 +10049,11 @@ function choose(i, byDice){
 
 function finish(N){
   st.over = true; UI.LS.del(key(st.id));
-  const seen = seenEnds(st.id); if (!seen.includes(st.node)){ seen.push(st.node); UI.LS.set(endKey(st.id), JSON.stringify(seen)); }
-  const total = nEnds(st.id);
-  const s = $('#story'); s.insertAdjacentHTML('beforeend', `<div class="scene bedscene"><p class="bhead">${UI.esc(N.end)}</p><p class="bp dim">You have now found ${seen.length} of ${total} different endings.</p></div>`);
+  const D = DEF[st.id]; const code = D.endCode ? D.endCode(st.F) : st.node;
+  const seen = seenEnds(st.id); if (!seen.includes(code)){ seen.push(code); UI.LS.set(endKey(st.id), JSON.stringify(seen)); }
+  const total = D.endTotal || nEnds(st.id); const noun = D.endNoun || 'endings'; const endName = typeof N.end === 'function' ? N.end(st.F) : N.end;
+  const s = $('#story'); s.insertAdjacentHTML('beforeend', `<div class="scene bedscene"><p class="bhead">${UI.esc(endName)}</p><p class="bp dim">You have now found ${seen.length} of ${total} different ${noun}.</p></div>`);
+  if (D.music) setTimeout(() => { if (!st || st.over) G.ambient.stop(); }, 30000);
   $('#opts').innerHTML = `<button class="opt" data-i="0"><span class="key">1</span><span class="lbl">Hear the story again, and choose differently</span></button><button class="opt" data-i="1"><span class="key">2</span><span class="lbl">Back to the story library</span></button>`;
   const again = () => B.start(st.id, false), lib = () => UI.toTitle();
   const els = $('#opts').querySelectorAll('button.opt'); els[0].onclick = again; els[1].onclick = lib;
@@ -9970,9 +10081,11 @@ B.start = (id, resume) => {
   if (resume){ try { const j = JSON.parse(UI.LS.get(key(id)) || 'null'); if (j && NODES[id][j.n]){ st.node = j.n; st.F = j.F || {}; } } catch(e){} }
   else UI.LS.del(key(id));
   const side = $('#rbody'); if (side) side.innerHTML = '';
-  clock(); getWake(); go(st.node);
+  clock(); getWake();
+  if (def.music && G.ambient){ G.ambient.start(def.music(st.F)); }
+  go(st.node);
 };
-B.stop = () => { clearTimers(); tok++; if (clockT){ clearInterval(clockT); clockT = null; } UI = UI || window.AQ_UI; if (UI){ UI.SP.mult = 1; UI.SP.pitch = 0.95; } document.body.classList.remove('bed', 'dim'); st = null; releaseWake(); };
+B.stop = () => { clearTimers(); tok++; if (clockT){ clearInterval(clockT); clockT = null; } UI = UI || window.AQ_UI; if (UI){ UI.SP.mult = 1; UI.SP.pitch = 0.95; } document.body.classList.remove('bed', 'dim'); st = null; releaseWake(); if (G.ambient) G.ambient.stop(); };
 B.skip = () => { if (!st) return; if (st.ask){ return; } paused = false; tok++; UI.stopSpeech(); const N = NODES[st.id][st.node]; if (N && !N.end) go(typeof N.next === 'function' ? N.next(st.F) : N.next); };
 B.voiceChanged = () => {
   if (!st || st.over || !curUnits.length) return;
@@ -9986,6 +10099,8 @@ B.onKey = e => {
   if (k === ' ' || e.code === 'NumpadDecimal' || (k === 'enter' && !st.over)){ e.preventDefault(); if (!st.over) togglePause(); return true; }
   if (k === 'm'){ UI.SP.on = !UI.SP.on; UI.LS.set('aq_voice_on', UI.SP.on ? '1' : '0'); if (!UI.SP.on) UI.stopSpeech(); UI.updateVoiceBtns(); B.voiceChanged(); const m = $('#bbMute'); if (m) m.textContent = UI.SP.on ? '🔊 Voice on' : '🔇 Voice off'; return true; }
   if (k === 'd'){ toggleDim(); return true; }
+  if (k === 'n' && DEF[st.id].music){ const on = G.ambient.toggle(); const mu = $('#bbMusic'); if (mu) mu.textContent = on ? '🎵 Music on' : '🔈 Music off'; UI.toast(on ? 'Music on' : 'Music off'); return true; }
+  if ((k === '[' || k === ']') && DEF[st.id].music){ const v = G.ambient.volume(k === ']' ? .1 : -.1); UI.toast('Music volume ' + Math.round(v * 100) + '%'); return true; }
   if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd'){ UI.SP.rate = Math.min(1.6, UI.SP.rate + .05); UI.LS.set('aq_rate', UI.SP.rate); UI.toast('Voice speed ' + UI.SP.rate.toFixed(2)); return true; }
   if (e.key === '-' || e.code === 'NumpadSubtract'){ UI.SP.rate = Math.max(.5, UI.SP.rate - .05); UI.LS.set('aq_rate', UI.SP.rate); UI.toast('Voice speed ' + UI.SP.rate.toFixed(2)); return true; }
   return false;
@@ -10406,6 +10521,616 @@ Object.keys(ENDS).forEach(h => {
     N['end_' + h + '_' + s] = { title: X.head.replace('Ending: ',''), art: E.art, end: X.head, text: F => E.core.concat([X.t], closing(F)) };
   });
 });
+})();
+
+</script>
+<script>
+/* WHATEVER COMES, WHATEVER GIVE — a bedtime story that is made to order.
+   Part 1: the registration, the five opening questions, the tables of words that change with your answers, the prelude and the four worlds.
+   The five answers pick one module each, so every combination (1,024 of them) is a different story of roughly fifty minutes. */
+(function(){
+const G = globalThis.G;
+const W = G.wcw = { MOD:{} };
+
+/* ---------------------------------------------------------------- the four worlds: little words that change with the age you chose */
+W.ERA = {
+ present: { when:'in the world of today', lamp:'street-lamp', lamps:'street-lamps', lantern:'small lantern', lanterns:'small lanterns', home:'little house', folk:'neighbours', bread:'warm bread and sweet tea', note:'a small notebook', hum:'the far-off hum of a night train', craft:'little rowing boat', ride:'night bus',
+   pet:'cat', petn:'the cat', petAdj:'a soft grey cat with one white paw', elder:'an old woman with silver hair and a knitted shawl', eldern:'the old woman', glow:'warm yellow windows', peak:'old clock tower', pen:'a pencil', chime:'a clock somewhere chiming the hour',
+   sage:'a retired teacher with a telescope on a folding stool', sagen:'the old teacher', shy:'a shy night-shift baker', shyn:'the baker', gift:'a folded paper star', track:'wristwatch', cloak:'old coat' },
+ ancient: { when:'long ago, in the days of lamps and bells', lamp:'oil lamp', lamps:'oil lamps', lantern:'oil lamp', lanterns:'oil lamps', home:'stone cottage', folk:'villagers', bread:'barley bread and honey', note:'a roll of parchment', hum:'the soft lowing of cattle in a far field', craft:'wooden boat', ride:'ox-cart',
+   pet:'donkey', petn:'the donkey', petAdj:'a patient old donkey with soft, drooping ears', elder:'an old hermit-scribe with a long white beard', eldern:'the old scribe', glow:'the glow of hearth fires behind shuttered windows', peak:'watchtower', pen:'a quill', chime:'a monastery bell tolling the hour',
+   sage:'an old scribe who kept the records of the heavens', sagen:'the old scribe', shy:'a shy old bell-keeper', shyn:'the bell-keeper', gift:'a ribbon of blue wool', track:'sundial', cloak:'woollen cloak' },
+ future: { when:'far in the future, among the stars', lamp:'glow-panel', lamps:'glow-panels', lantern:'glow-lantern', lanterns:'glow-lanterns', home:'quiet room in the habitat ring', folk:'neighbours of the ring', bread:'warm soup from the galley', note:'a thin slate', hum:'the soft hum of the great ring turning', craft:'silent skiff', ride:'glide-car',
+   pet:'robin', petn:'the robin', petAdj:'a small, round, feathered drone, as soft and as friendly as a robin', elder:'an old station keeper with kind, tired eyes', eldern:'the keeper', glow:'long strips of soft blue light', peak:'signal spire', pen:'a light-pen', chime:'a soft chime rolling round the ring',
+   sage:'an old astronomer in the observation lounge, with a mug of something warm', sagen:'the old astronomer', shy:'a shy night-gardener of the ring', shyn:'the gardener', gift:'a small glass bead of light', track:'wrist-band', cloak:'soft grey jacket' },
+ dream: { when:'in a dreamland outside of time', lamp:'firefly lantern', lamps:'firefly lanterns', lantern:'firefly lantern', lanterns:'firefly lanterns', home:'cloud cottage', folk:'dreamers', bread:'warm moon-bread and starlight tea', note:'a book of blank pages', hum:'the faint humming of the sleeping hills', craft:'boat of woven cloud', ride:'drifting leaf',
+   pet:'fox', petn:'the fox', petAdj:'a small fox whose tail glows like an ember', elder:'an old cloud-shepherd with a silver staff', eldern:'the shepherd', glow:'drifting lanterns', peak:'tower of lanterns', pen:'a pen of starlight', chime:'a soft chime from nowhere in particular',
+   sage:'an old owl who kept the accounts of the sky', sagen:'the old owl', shy:'a shy keeper of the night-lamps', shyn:'the keeper', gift:'a feather of silver light', track:'pocket moon-dial', cloak:'cloak of soft grey cloud' }
+};
+
+/* ---------------------------------------------------------------- the four places */
+W.PLACE = {
+ water: { name:'by the water', where:'beside a quiet stretch of water', here:'the water\'s edge', way:'along the water\'s edge', view:'across the water', ground:'the damp, cool sand', up:'out over the water' },
+ wild:  { name:'in the hills and forests', where:'among quiet hills and forests', here:'a clearing among the trees', way:'up the winding forest path', view:'through the trees', ground:'the soft, mossy ground', up:'up through the branches' },
+ town:  { name:'in a town at night', where:'in a town at night', here:'the little square', way:'through the lamplit streets', view:'over the rooftops', ground:'the smooth, worn cobbles', up:'up the long stair' },
+ sky:   { name:'high up, near the sky', where:'high up, close to the sky and the stars', here:'a wide, high terrace', way:'up the long, curving stair', view:'across the endless sky', ground:'the cool, smooth stone', up:'up into the open sky' }
+};
+
+/* ---------------------------------------------------------------- the four kinds of story, the four travelling companions, the four endings */
+W.TYPE = {
+ science: { noun:'a scientific tale of wonder and discovery', gift:'what the stars had taught you' },
+ romance: { noun:'a gentle, romantic tale', gift:'the two lights that found each other' },
+ mystery: { noun:'a quiet mystery', gift:'the soft answer to the humming' },
+ friend:  { noun:'a warm tale of friendship and kindness', gift:'the long, warm table' }
+};
+W.COMP = F => {
+  const E = W.ERA[F.a];
+  return { guide: { recap:`a wise and kindly guide beside you`, n:'your guide', l:[
+      `Your guide listens, as only the very wise can listen, with a quiet face and a patient heart.`,
+      `Your guide smiles, and nods, as though this were exactly what was meant to happen.`,
+      `Your guide says nothing, and the nothing is warm, and kind, and full of understanding.` ] },
+    dear: { recap:`someone dear to you beside you`, n:'your dear one', l:[
+      `Your dear one is walking close beside you, and every so often your shoulders touch, and neither of you minds.`,
+      `Your dear one looks at you, and smiles a small, private smile, the kind that needs no explaining.`,
+      `Your dear one slips a hand into yours, and the hand is warm, and you hold it, and the night grows kinder.` ] },
+    animal: { recap:`${E.petAdj} beside you`, n:E.petn, l:[
+      `${E.petn[0].toUpperCase() + E.petn.slice(1)} pads along beside you, unhurried, with the calm of a creature who has never once been in a rush.`,
+      `${E.petn[0].toUpperCase() + E.petn.slice(1)} looks up at you with wide, dark, trusting eyes, and then looks away again, perfectly content.`,
+      `${E.petn[0].toUpperCase() + E.petn.slice(1)} gives a long, soft, drowsy sigh, and the sigh is so peaceful that you find yourself sighing too.` ] },
+    alone: { recap:`no one but you and the night`, n:'the night', l:[
+      `You are alone with the night, and the night turns out to be very good company, quiet, and wide, and entirely on your side.`,
+      `There is nobody beside you, and you do not feel lonely at all. Everything around you is breathing gently, and so are you.`,
+      `You walk by yourself, at your own pace, and it is a comfort to know that there is nothing you have to do, and nobody you have to be.` ] }
+  }[F.d];
+};
+W.MOOD = {
+ joy:    { feel:'happy and joyful', mood:'joy' },
+ calm:   { feel:'calm, and quiet, and still', mood:'calm' },
+ wonder: { feel:'full of wonder', mood:'wonder' },
+ tender: { feel:'tender, and warm', mood:'tender' }
+};
+W.TITLES = {
+ present: { science:'The Night Sky Over the Rooftops', romance:'A Light in the Window', mystery:'The Humming at Midnight', friend:'Soup for the Whole Street' },
+ ancient: { science:'The Scribe Who Counted the Stars', romance:'Two Lamps in the Dark', mystery:'The Bell That Rang Itself', friend:'The Long Table at Midwinter' },
+ future:  { science:'The Light That Left Before You Were Born', romance:'A Message Across the Ring', mystery:'The Quiet Corridor', friend:'The Garden at the Edge of the Station' },
+ dream:   { science:'The Library of Falling Stars', romance:'The Ribbon Between Two Hills', mystery:'The Door That Was Always Open', friend:'The Fox Who Kept the Lanterns' }
+};
+const cx = F => ({ E: W.ERA[F.a], P: W.PLACE[F.c], C: W.COMP(F), T: W.TYPE[F.b], M: W.MOOD[F.e], title: W.TITLES[F.a][F.b] });
+W.cx = cx;
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+W.cap = cap;
+
+/* ---------------------------------------------------------------- the registration and the five opening questions */
+G.bedStory('whatever', {
+  title:'Whatever Comes, Whatever Give', icon:'✨', art:'starfield|✨', start:'q1', rate:0.85, pitch:0.9, askWait:15, endTotal:1024, endNoun:'stories',
+  music: F => ({ mood: (W.MOOD[F.e] || W.MOOD.calm).mood, world: F.a || 'dream' }),
+  endCode: F => [F.a, F.b, F.c, F.d, F.e].join('-'),
+  tag:'A bedtime story made to order · five opening questions, then no more choices · over a thousand different stories · soft music · each about fifty minutes',
+  desc:'Before you sleep, answer five short questions: when and where you would like to be, what kind of story you want, who you would like beside you and how it should feel at the end. Then the choices stop, the music begins softly, and a story made just for your answers is told to you from start to finish, slowly, and with no interruptions. Over a thousand different stories are possible, each about fifty minutes long.',
+  intro:'WHATEVER COMES, WHATEVER GIVE\nA bedtime story made to order.\nFirst, five short questions, each with four answers, about the kind of story you would like to hear tonight. After the fifth, the choices stop for good. Soft music begins, and one long story, made from your answers, is told to you without interruption, for about fifty minutes. Close your eyes, or dim the screen, and let it carry you off to sleep.',
+  nodes: {
+
+q1: { ask:true, flag:'a', title:'Question One', art:'starfield|✨', text:[
+`Welcome. Tonight, the story will be made just for you. First, I will ask you five short questions, and after the last one, there will be no more choices at all. You will only have to listen. If you would like to choose, press a number key or tap. If you wait a little, the dice will choose for you.`,
+`Question one of five. Where, in time, would you like tonight's story to take place?`
+], opts:[
+ { t:`Right now, in the world of today.`, v:'present', to:'q2' },
+ { t:`Long ago, in ancient or medieval times.`, v:'ancient', to:'q2' },
+ { t:`Far in the future, among the stars.`, v:'future', to:'q2' },
+ { t:`In a timeless dreamland that never was.`, v:'dream', to:'q2' }
+]},
+q2: { ask:true, flag:'b', title:'Question Two', art:'starfield|✨', text:[
+`Question two of five. What kind of story would you like to hear?`
+], opts:[
+ { t:`A scientific tale of wonder and discovery.`, v:'science', to:'q3' },
+ { t:`A gentle, romantic tale.`, v:'romance', to:'q3' },
+ { t:`A quiet mystery, with a soft answer.`, v:'mystery', to:'q3' },
+ { t:`A warm tale of friendship and kindness.`, v:'friend', to:'q3' }
+]},
+q3: { ask:true, flag:'c', title:'Question Three', art:'starfield|✨', text:[
+`Question three of five. Where would you like to be?`
+], opts:[
+ { t:`By the sea, or beside a river.`, v:'water', to:'q4' },
+ { t:`In the hills and the forests.`, v:'wild', to:'q4' },
+ { t:`In a town or a city at night.`, v:'town', to:'q4' },
+ { t:`High up, close to the sky and the stars.`, v:'sky', to:'q4' }
+]},
+q4: { ask:true, flag:'d', title:'Question Four', art:'starfield|✨', text:[
+`Question four of five. Who would you like to have beside you?`
+], opts:[
+ { t:`A wise and kindly guide.`, v:'guide', to:'q5' },
+ { t:`Someone dear to you.`, v:'dear', to:'q5' },
+ { t:`A gentle animal friend.`, v:'animal', to:'q5' },
+ { t:`No one. Just you, and the night.`, v:'alone', to:'q5' }
+]},
+q5: { ask:true, flag:'e', title:'Question Five', art:'starfield|✨', text:[
+`The last question. Question five of five. How would you like the story to feel when it ends?`
+], opts:[
+ { t:`Happy, and joyful.`, v:'joy', to:'t_pre' },
+ { t:`Calm, and quiet, and still.`, v:'calm', to:'t_pre' },
+ { t:`Full of wonder.`, v:'wonder', to:'t_pre' },
+ { t:`Tender, and warm.`, v:'tender', to:'t_pre' }
+]}
+
+}});
+
+/* ---------------------------------------------------------------- the prelude: told once, whatever you chose (about 650 words) */
+W.MOD.prelude = F => { const { E, P, C, T, M, title } = cx(F); return [
+`Thank you. That is all the choosing for tonight. From here until the end, there is nothing at all for you to do, and nothing to decide. The music is beginning, very softly, somewhere beyond the edge of hearing, and the story will tell itself. All you need to do is lie back, and listen, and let your breathing grow slow.`,
+`Tonight's story is called ${title}. It is ${T.noun}, set ${E.when}, ${P.where}, with ${C.recap}. And when it ends, it will feel ${M.feel}. It has never been told before in exactly this way, and it will never be told in exactly this way again, because it was made, just now, from your own five answers.`,
+`So. Let your head sink into the pillow. Let it sink a little deeper than it did a moment ago, as though the pillow were made of warm, soft sand, and your head were the first thing to rest on a beach at the end of a long day. Let your forehead smooth out. Let your jaw loosen, and your tongue grow heavy and lazy in your mouth. Let your shoulders drop.`,
+`Breathe in, slowly, through your nose, and feel the air fill you from the bottom, like water filling a jar. Hold it for a moment, only a moment. And let it go, slowly, through your mouth, and let everything go with it. Once more. In, and hold, and out. Already, your body feels a little heavier, and a little warmer, and a little further away.`,
+`Feel your hands. They are resting wherever they are resting, and they are quite finished for the day. Feel your arms, heavy as warm bread dough. Feel your legs, long and loose and tired in the best way. Feel your feet, which have carried you through so much today, and which may now put the whole thing down.`,
+`Somewhere nearby, the world is going quiet. The sounds of the day are folding themselves away, one by one, like children's clothes put neatly on a chair. A door closes, a long way off. A voice says goodnight. The last bright thing in the room, whatever it was, grows dim, and the dark that is left is the soft, friendly dark of a place that is safe.`,
+`You are not in a hurry. You have never been in less of a hurry in your life. There is a whole night ahead of you, and it is yours, and it is long, and slow, and kind. And in the middle of the night, a little way ahead, there is a story waiting. It has been waiting for you, patiently, the way a lamp waits in a window.`,
+`In a moment, the room around you will begin to soften. The edges of things will blur, and brighten, and turn to something else, the way the edges of a dream do. You will not have to do anything. You will simply find that you are somewhere else, and that it is perfectly all right, and that you have been there all along.`,
+`Breathe in. And breathe out. The room is growing soft. The pillow is growing soft. The dark behind your eyes is turning, very gently, into the first scene of the story. Here it comes. Let it come. Let it come as slowly as it likes.`
+]};
+
+/* ---------------------------------------------------------------- THE WORLD: where and when you find yourself (about 800 words each) */
+W.MOD.world = {
+present: F => { const { E, P, C } = cx(F); return [
+`You are standing in the middle of the world of today, at night, and it is quieter than you remember it ever being. The day's noise has drained away, as it does every evening, and left something softer behind: a hush made of a thousand small sounds that are too gentle to be called noise at all. A fridge hums, somewhere behind a wall. A tap drips, once. A car passes, very slowly, and its lights slide over the ceiling of the sky and are gone.`,
+`The ${E.lamps} are lit, each one standing in its own round pool of yellow light, like a row of small suns that have agreed to be gentle. Moths turn in the light, slow and soft and silent. Beyond the ${E.lamps}, there are ${E.glow}, dozens of them, hundreds, each one a room where someone is brushing their teeth, or reading the last page of a chapter, or standing at the sink, looking out at nothing, for a minute, which is one of life's quiet pleasures.`,
+`You can hear ${E.hum}, going by in the dark, a long way off, and then a little further, and then not at all. It is a lonely sound for some people, and a comforting one for others. Tonight, for you, it is comforting. It is the sound of the world carrying on, steadily, with its own business, while you rest. There is nothing you need to do about it. The trains know where they are going.`,
+`The air is cool, and smells faintly of rain on warm pavement, and of someone's late supper, and of the sweet green smell of cut grass from a garden you cannot see. You are wearing your ${E.cloak}, and it is exactly the right weight, and the pockets are deep. You put your hands in them, and feel the small, familiar things that live there: a coin, a key, a folded receipt, a scrap of something that might once have been a sweet.`,
+`Overhead, past the glow of the ${E.lamps}, the sky is very dark, and very high, and strewn with the few stars that can win against the city's light. You do not need many. A handful is enough. There is the pale, calm shape of the moon, low in the east, round as a plate, and a single bright planet, steady and unblinking, which is not a star at all, but another world, going about its own quiet business, a very long way away.`,
+`It is the hour when ordinary things become beautiful. A bin lorry waits, silent, at the corner, its orange light turning. A cat on a wall washes one paw and looks at you without surprise. A paper bag moves, very slightly, along the gutter, in a breeze that you can hardly feel. Everything is where it belongs, and everything has stopped, for the night, at the end of a long day, and is resting.`,
+`Somewhere, a window opens, and a voice says, quite quietly, that the washing is still out. Somebody laughs, softly, and the window closes. You smile. These are the small, kind, domestic sounds of people who are looking after each other, without any fuss, in the ordinary way, as people always have. Nobody is being clever. Nobody is hurrying. It is only evening, and everybody is nearly home.`,
+`You begin to walk. It does not matter where. You have the feeling, which comes only rarely, that wherever you walk tonight will turn out to be the right way, that the night itself will lead you, the way a river leads a leaf. Your feet find the pavement, and the pavement is cool, and your steps are slow and even and quiet, and the quiet goes in and out with your breath.`,
+`And as you walk, you feel the day finally leaving you. It does not go all at once. It goes like the tide, a little further out with each step, leaving the beach of your mind smooth and clean and wide. The things you meant to do, the things you said, the things you forgot, they are all out there somewhere, far away, small and bright and harmless, like boats on the horizon.`
+]},
+ancient: F => { const { E } = cx(F); return [
+`You are walking along a worn road, long ago, in the soft blue hour after the sun has gone, and the whole land is settling for the night. The road is made of packed earth and old stones, smoothed by a thousand years of feet and wheels and hooves, and it winds ahead of you between low walls of piled grey rock. The air is cool, and smells of woodsmoke, and wet leaves, and the warm, animal smell of cattle in a nearby barn.`,
+`There are no engines here, and no wires, and no hum of anything that was built to be loud. There is only the world, speaking in its own small voices. A stream, somewhere, tumbling over stones. A breeze moving in the tops of tall trees. Far off, ${E.hum}, drifting over the fields, patient, and slow. And somewhere, closer, a dog barks twice, and thinks better of it, and lies down.`,
+`You are wearing a ${E.cloak}, rough, and heavy, and warm, and it smells of sheep and rain and wood-smoke, and it wraps around your shoulders like the arms of a very large and quiet friend. You pull it closer. On your feet are good strong boots, softened by long use, and in a leather pouch at your belt are the few small things that a traveller carries: a knife, a crust of bread, a stub of candle, a flint.`,
+`Ahead, on the side of the hill, there are lights. They are small, and yellow, and unsteady, the lights of ${E.lamps} and hearth fires, glowing through gaps in shutters and under the edges of thatched roofs. There are perhaps thirty of them, scattered across the slope like fallen sparks, and each one is a home, and each home has a family in it, and each family is settling down to sleep, as families have always done.`,
+`A thin line of smoke rises from every chimney, straight up, in the windless air, and spreads out, high above, in a long, pale roof. The smoke smells of apple wood, and oak, and peat. Somewhere, somebody is baking, a very late loaf, for the morning, and the smell of it drifts down the road to meet you, warm, and sweet, and yeasty, and utterly comforting. Your stomach gives a gentle, contented rumble.`,
+`On the top of the hill, black against the deep blue of the sky, stands the ${E.peak}, old and square and solid, with a small flame burning in its highest window. It has stood there for longer than anyone can remember. Somebody lights that flame every night, and somebody puts it out every dawn, and in between, it tells every traveller on every road, there is a place here, and you are welcome.`,
+`The first stars are coming out, one by one, in the east, over the dark shoulder of the hills. They are much brighter than the stars you may have known. There is no glow of cities to dim them, and there are so many of them, scattered thickly across the sky like grain thrown out of a sower's hand, that the dark between them seems hardly to be there at all. You look up, and let yourself be small under them, and it is a peaceful thing, to be small.`,
+`${E.chime[0].toUpperCase() + E.chime.slice(1)}, very far away, and the sound rolls over the fields and the hedges and the sleeping animals, round and golden and slow, and fades, and is gone. The villagers will be counting it. Somebody will be saying, in a low voice, to a child who will not settle, that it is time to be asleep. And the child will say, just one more story. And the grown-up will say, just one.`,
+`You walk on, along the old road, with your cloak around you, and the stones under your boots, and the lights on the hill growing nearer, one slow step at a time. You are not tired in the way that hurts. You are tired in the way that is almost the same as being happy, the way you are tired after a long day of good work. The road is kind. The night is kind. Everything is going to be quite all right.`
+]},
+future: F => { const { E } = cx(F); return [
+`You are walking along a curving corridor, far in the future, a very long way from the world you were born in, and the world you are in now is a great, slow wheel, turning in the dark between the stars. It is called the ring, and it is as big as a town, and it carries thousands of people, in their homes, and their gardens, and their schools, through the vast, cold, silent night of space, and nobody on it is afraid at all.`,
+`It is evening on the ring. The lights have been dimmed, as they are every evening, from the bright white of day to the soft, warm amber of dusk, so slowly that nobody notices it happening. Along the walls run ${E.glow}, glowing gently, and under your feet the floor is smooth and slightly springy, and there is a faint, steady vibration in everything, ${E.hum}, so deep and so constant that you feel it more than hear it, like a heartbeat in the walls.`,
+`You are wearing your ${E.cloak}, light and soft, and warm against the cool, clean air. On your wrist is your ${E.track}, glowing a calm green, to tell you that everything is well. You pass a window, a long, wide, curving window, and you stop, as you always stop, because beyond it there is nothing at all, only the stars, so many, and so bright, and so utterly still, that for a moment you forget to breathe.`,
+`They do not twinkle here, because there is no air to make them twinkle. They are simply there, hard, and clear, and perfect, thousands of tiny white points laid out on a black cloth. And far away, at the very edge of the window, there is a small blue-white spark that is the sun, and a fainter one beside it that is the world, from which, long ago, your many-times-great-grandparents set out. You wave to it, a little, in your mind.`,
+`The corridor is quiet. Doors slide open, softly, as you pass, and close behind you with a sound like a sigh. Through one, you glimpse a family at a table, eating ${E.bread}, with a small child asleep across two chairs. Through another, an old man sits in a chair, reading a very old paper book, turning its pages with one slow finger. Through another, a girl is practising a song on a violin, very quietly, so as not to wake her little brother.`,
+`Everyone you pass nods to you, or smiles, or lifts a hand. ${E.folk[0].toUpperCase() + E.folk.slice(1)} know each other here, in the way that people always do when they live close together on a long journey, through a great deal of ordinary kindness. Somebody has left a small pot of herbs outside every door. Somebody has painted a row of tiny yellow stars along the wall. Somebody has hung a sign that says, quite simply, rest well.`,
+`${E.chime[0].toUpperCase() + E.chime.slice(1)}, once, to mark the hour, and the sound goes all the way round the ring, and comes back to you from the other side, very faint, and very sweet. It takes about a minute to go round. You stand and listen to it go, and listen to it return, and you think that it is the loveliest thing you have heard in a long time, and a perfectly good reason to stay awake for another second, and then to fall asleep.`,
+`A small cleaning drone glides past, humming to itself, no larger than a loaf of bread, polishing the floor in long, slow, careful strokes. It pauses beside you, tilts, and gives a friendly little chirp, as if to say, good evening, and carries on. Everything on the ring is quietly looked after. Everything has somebody, or something, to tend it, and nothing is forgotten, and nothing is left behind.`,
+`You begin to walk again, slowly, along the great curve, and the floor ahead of you seems to rise gently, forever, though you know it is only the curve of the ring, going round and round, and round. There is no end to it, and no beginning, and no need to hurry along it. It is simply a long, quiet road in the dark, with lights, and homes, and stars, and you are on it, and it is a good place to be.`
+]},
+dream: F => { const { E } = cx(F); return [
+`You are in a dreamland, outside of time, and it is not like anywhere you have been, and yet it feels as familiar as the inside of your own pillow. The sky is the colour of deep violet, shot through with silver, and it hangs very low, so low that you feel you could reach up and touch it, and find it soft, like velvet, or like the skin of a plum. There is no sun, and no moon, and yet everything is gently lit, from within.`,
+`The air is warm, and very still, and it smells of everything you have ever loved, all at once: baking bread, and new rain, and the pages of an old book, and the damp fur of a dog that has been playing in the garden, and the inside of your grandmother's coat. You breathe it in, and it fills you up, slowly, and warmly, and you feel, from the soles of your feet to the crown of your head, quite perfectly safe.`,
+`You are wearing a ${E.cloak}, and it is made of something that feels like a soft grey cloud, and it is so light that you can hardly feel it, and so warm that you could sleep in it, standing up. It moves around you, slowly, in a wind that is not there. Your feet do not quite touch the ground, though they do not float either. They rest on something that is somewhere between a path and a thought.`,
+`All around you, ${E.lamps} drift, gently, through the dark, each one a small, round, glowing light, red, or gold, or soft green, or the blue of the very first hour of morning. They rise, and fall, and turn in slow, lazy circles, like leaves in a pond. When you hold out a hand, one of them settles on your fingers, as lightly as a moth, and glows there, warm, and hums, very quietly, to itself, a tune with no words in it.`,
+`Far off, you can hear ${E.hum}, a long, slow, deep, comforting sound, like a very large animal sleeping. It rises, and falls, and rises, as steadily as the tide. You find that your own breath has fallen in with it, and that when it rises, you rise, and when it falls, you fall. It is as if the whole land were breathing in one slow, enormous, happy sleep, and you were a small part of the dream it was having.`,
+`There are hills here, round and soft and green-black, like the backs of great sleeping animals. There are trees, whose leaves are the colour of silver, and which chime very faintly as they move. There are rivers, which flow upward, in long, shining ribbons, into the sky, and fall as rain, from somewhere else, on the other side. None of it is strange. All of it is as it should be, in a place where nothing needs to make sense.`,
+`${E.chime[0].toUpperCase() + E.chime.slice(1)}, and the chime floats through the dark, and everything leans a little toward it, the ${E.lamps}, and the trees, and the hills, and you. It is a sweet, round, silvery sound, and it seems to say, there is nothing to be afraid of, here, and nothing to be done, and everything is already, quite beautifully, taken care of.`,
+`Somewhere, a very long way off, you think you hear singing, and it is not any song you know, and yet you know it completely. It is made of all the lullabies there have ever been, sung by all the people who have ever sung them, to all the children who have ever been tucked in and kissed on the forehead and told to sleep. It is the song of every goodnight in the history of the world, and tonight, it is for you.`,
+`You begin to walk, though there is no road. Your feet find their way across the soft ground, as easily as a boat finds its way across a pond, and the dream moves with you, opening gently ahead, and closing gently behind. There is nowhere in particular to go, and no hurry to get there. You are in the right place already, you are going to the right place next, and the road between is as kind as the destination.`
+]}
+};
+})();
+
+</script>
+<script>
+/* WHATEVER COMES, WHATEVER GIVE — part 2: the four places and the four companions. */
+(function(){
+const G = globalThis.G, W = G.wcw, cx = W.cx, cap = W.cap;
+
+/* the first paragraph of each place changes with the age you chose: sixteen different arrivals */
+const ARRIVE = {
+ present: {
+  water:`Your walk brings you, quite naturally, to the water. At the end of the street, the houses fall away, and a low sea wall begins, and beyond it a wide, dark estuary lies like a sheet of slate, with the lights of the far shore laid across it in long, trembling lines. A few small boats are tied up along the quay, rocking very slightly, with their ropes creaking.`,
+  wild:`Your walk brings you, without your noticing, to the edge of the town, where the last street lamp stands, and beyond it a footpath goes up into the dark, between hedges, and then between trees. The path is pale and dry, and smells of leaf-mould. You walk past the last of the light, and the woods close round you softly, like one hand closing round another.`,
+  town:`Your walk takes you into the middle of the town, where the little streets knot together around a square. There is a bakery with its shutters down, a closed bookshop with one lamp left on above the poetry, a fountain that has turned itself off for the night, and a bench under a tree, worn smooth by a hundred years of people sitting down to rest.`,
+  sky:`Your walk brings you to the foot of a tall old building, and a door that somebody has left unlocked, and a staircase that winds up and up inside. You climb, slowly, without hurrying, past landings and little windows, until the last door opens onto a flat roof, and you step out under the whole wide sky, with the lights of the city spread below you like a fallen constellation.` },
+ ancient: {
+  water:`The road brings you down to the water: a wide, slow river, bending between reeds, with a wooden jetty reaching out into it and a few small boats drawn up on the bank. The water is dark and silky, and the last light of the sky lies on it in a long, pale stripe. Frogs are calling in the rushes, one answering another, in slow, sleepy turns.`,
+  wild:`The road brings you to the edge of an old, deep wood, and a track leading into it, between great oaks and beeches whose branches meet overhead. It is dark under the trees, but not a frightening dark, a soft, green-black dark that smells of moss and leaves and earth. Somewhere, a long way in, an owl calls, and another answers, as if to say, here, and here.`,
+  town:`The road brings you through the old gate of a little walled town, and the cobbled streets go winding up between leaning houses, their upper storeys almost touching across the lanes. Small lamps hang from iron brackets. A cat sits on a doorstep. A fountain trickles in the market square, and a man is sweeping up the last of the day's straw, whistling very softly through his teeth.`,
+  sky:`The road brings you up, and up, over the hills, to a high place where the land runs out: a grassy headland, with a ring of old standing stones, and above it the sky, so wide and deep that it seems to curve down on every side to meet the earth. The wind is soft and cool, and carries the smell of thyme, and the stars seem close enough to gather in your hands.` },
+ future: {
+  water:`The corridor opens, at last, into a great garden-hall, and in the middle of it lies a lake: a long, calm, curving lake, built into the floor of the ring, with real water, and real reeds, and real ducks sleeping on it. Soft lights glow beneath the surface, and the ceiling above is painted with a gentle, artificial night, and a gentle, artificial moon.`,
+  wild:`The corridor opens into the forest deck, a long, curving wood, planted generations ago, that has grown up under the lamps to a hundred metres wide. There are tall pines and silver birches, and soft paths of bark, and the air is cool and green and smells of resin. A fine mist hangs between the trunks, and somewhere an owl, which was bred for this very place, is calling.`,
+  town:`The corridor opens into the market street, a long, wide, curving avenue of little shops, and cafes, and workshops, and homes, all closed for the night, with their awnings rolled up and their small lamps burning. The street is paved with warm golden tiles, and from a window overhead comes the faint sound of somebody practising a lullaby on a cello.`,
+  sky:`The corridor opens onto the observation deck, a great glass half-dome on the outside of the ring, and beyond the glass lies nothing but stars, and the long, dark, silent universe, going on for ever in every direction. The floor is warm. There are soft cushions scattered about, and a few people already lying on them, wrapped in blankets, looking up. You find a place among them.` },
+ dream: {
+  water:`The dream carries you gently to the edge of a sea: a wide, silver, silent sea, which rolls in on to a beach of pale, glittering sand, and rolls out again without a sound. The waves are the colour of moonlight on glass, and when they break, they break into tiny sparks of light that float for a moment in the air, and go out, one by one, like the last candles at a party.`,
+  wild:`The dream carries you gently to the edge of a wood, which is not like other woods. The trees are tall, and slender, and silver-barked, and their leaves are made of soft, glowing, pale-green light, and they sway in a breeze that is not blowing. Between the trunks, a path of moss winds off into the shadows, and little blue flowers open and close beside it, like slow, sleepy eyes.`,
+  town:`The dream carries you gently into a town that has never been built, and has always existed: a town of crooked, friendly houses painted the colours of sunsets, with round windows, and chimneys that curl like question marks, and steps that go up to doors at the wrong height. There are no people in the streets, but every window is lit, and from every chimney a small, happy cloud of smoke goes up.`,
+  sky:`The dream carries you gently up, and up, until you are standing on the top of a very tall hill, or a very low cloud, it is difficult to tell which, with the whole night sky laid out around you in every direction. The stars are enormous and soft, like lanterns, and so close that, if you reach up, your fingers come away dusted with silver. Everything is perfectly, deeply quiet.` }
+};
+
+W.MOD.place = {
+water: F => { const { E, P } = cx(F); return [ ARRIVE[F.a].water,
+`You stand quite still, and listen to the water. It is a soft sound, a sound made of many smaller sounds, a lapping, a trickling, a slow, sleepy sucking at the edge, and a whispering, where it slides over stones. It never repeats itself exactly, and it never stops. It is the oldest lullaby in the world, and it has been sung every night since before there were ears to hear it.`,
+`The surface of the water is very smooth, and in it lies the whole sky, upside down: the moon, round and soft, and the stars, each one doubled, and, between them, a deep, black, velvety nothing that goes down and down for ever. A ripple crosses it, slowly, from somewhere, and the stars tremble, and break into pieces, and gather themselves together again, one by one, as the water grows still.`,
+`Something moves among the reeds: a heron, tall and grey, standing on one leg in the shallows, as still as a post. It turns its long neck, looks at you with one round gold eye, and decides that you are harmless. It goes back to watching the water, with the patience of a creature that has all the time in the world, and has never once been in a hurry.`,
+`The air smells of cool wet stone, and green weed, and mud, and, very faintly, of rain that fell somewhere upstream, a long time ago. There is a coolness coming off the water that lies against your face like a damp, gentle cloth, and your cheeks, which were warm, grow cool and calm. You breathe it in, the whole slow length of it, and breathe it out.`,
+`Close to the edge, tied to a post by a loop of rope, a ${E.craft} rocks, empty, on the small waves. It is a sweet, plain, well-kept little thing, with a worn seat, and a pair of oars laid neatly in the bottom, as though somebody had stepped out of it, only a moment ago, and said they would be right back. It bobs, and knocks softly against the post, tok, tok, tok, like a very slow clock.`,
+`You crouch, and trail your fingers in the water, and it is cooler than you expected, and softer, and it slips between your fingers like silk. Rings spread out from your hand, round and round, wider and wider, and the stars in them wobble, and sway, and settle. You watch them for a long time, and nothing at all is asked of you.`,
+`It occurs to you that the water is always going somewhere, and never in a hurry. It leaves, and is replaced, and leaves, and is replaced, and yet it is always the same river, the same sea, the same quiet shining. There is a lesson in that, perhaps, about letting things go, and letting things come. But you do not have to learn it tonight. You only have to watch it go by.`,
+`The little waves come in, and go out, in time with your breath. In, and out. In, and out. You find that you are breathing along with the water, and that each wave seems to carry away a little of whatever you were holding, a thought, a tightness, a worry, and bring back, in its place, something cool, and clean, and quiet. Your eyelids grow heavy. The night draws a little closer, like a blanket being tucked in.`
+]},
+wild: F => { const { E, P } = cx(F); return [ ARRIVE[F.a].wild,
+`You walk on, under the trees, and the ground is soft under your feet, thick with years of fallen leaves, and needles, and moss, so that your steps make hardly any sound at all. The trunks rise on either side, tall and straight and dark, like the pillars of an enormous, silent hall. High overhead, the branches interlace, and through them, in small, bright pieces, come the stars.`,
+`An owl calls, a long way off, a deep, round, hollow note, hoo-hoo, hoooo, and then, closer, another answers it. They go back and forth, patiently, like two old friends on either side of a valley, telling each other that all is well. You find yourself smiling, though there is nobody to see, and, in the dark, it is a pleasant, private smile.`,
+`Something small rustles in the leaves, and you stop, and wait. A hedgehog, round and brown, and busy, comes snuffling out from under a root, and crosses the path in front of you, in no hurry whatever, and disappears into a clump of ferns on the other side. Its small, important footsteps patter away, and fade. You let out a breath you did not know you were holding.`,
+`Far up the slope, between the trunks, there is a faint movement, and you see them: two deer, standing quite still in a patch of moonlight, their ears turned toward you, their great dark eyes shining. They watch you for a long, calm moment. Then, with one slow, easy step, and then another, they turn and vanish, as quietly as breath, into the dark.`,
+`The air is damp and cool and sweet. It smells of moss and wet bark and mushrooms, and the faint, spicy smell of pine, and under it all, the deep, brown smell of the earth itself, which is the oldest smell there is, and the one you would know anywhere. It goes into you, and settles somewhere low, and makes your whole body feel a little heavier, and a little more at home.`,
+`A little further on, somebody has hung a ${E.lantern} from a low branch, and it burns there, steady and small, a patch of warm gold in the green dark. Nobody is near it. It has been left, you think, for anyone who might pass, the way a person leaves a light on in a hall. Its glow touches the leaves, and the leaves glow back, and for a moment, the whole little clearing is lit like a room.`,
+`You lean against the trunk of a great old tree, and it is broad, and warm, and rough, and it holds you up completely. You can feel, through the bark, the slow, deep, invisible life of it, drawing water up from the ground, a drop at a time, all the way to the highest leaf. It has been doing this for two hundred years, and it does not mind that you have stopped to rest.`,
+`Through the gap in the branches, the stars are shining, and a breeze moves, high up, in the leaves, a long, soft, rushing whisper, shhhh, like the sound of a large and patient parent hushing a restless child. The whole wood is hushing. The trees, and the ferns, and the little creatures in the roots. Hush, they say, hush. There is nothing to do. Rest. Rest.`
+]},
+town: F => { const { E, P } = cx(F); return [ ARRIVE[F.a].town,
+`The streets around the square are narrow, and winding, and smell of old stone, and warm bread, and, faintly, of woodsmoke and rain. Every window has its own small light, some yellow, some orange, some the pale blue of a screen or a lamp turned low. Behind the glass, you can make out the shapes of curtains, and bookshelves, and plants, and a cat or two, sitting upright on windowsills, like small, grave, furry guards.`,
+`High up, in one window, someone is playing a piece of music on a single, quiet instrument. It is slow, and simple, and a little sad, and a little hopeful, a tune that goes up three steps and comes gently down one. They play it again, and again, and each time they play it, a little more softly, until it is hardly more than a breath, and then it stops, and the silence afterward is warm and full.`,
+`Beside the fountain, a cat is sleeping on the warm stone, curled up in a perfect circle, with its nose under its tail. It opens one eye as you pass, and closes it again. It has seen every person who has ever crossed this square, and it has never found any of them worth getting up for, and there is something deeply restful in this, in being quite unimportant to a cat.`,
+`The fountain makes a soft, steady, tinkling, splashing sound, like somebody pouring tea, over and over, into a china cup. A few drops of it blow across the cobbles, and lie there shining, like scattered beads. The air tastes faintly of mineral and moss, and, beneath that, of the day's heat, which is still being given back, slowly, by the old stones.`,
+`There is a clock in the square, high on the front of a building, and it says that the hour is late. Its hands are black against its pale face, and its tick is so soft, from this distance, that you feel it more than hear it, like the slow pulse in your own wrist. Tick, and tick, and tick. It is counting, gently, on behalf of everyone who has stopped counting for the night.`,
+`You sit on the bench under the tree, and the wood is warm, and its slats fit the shape of your back as though they were made for it. The leaves rustle overhead. Somewhere, a door closes softly, and a key turns in a lock, and a person says goodnight to a dog. The sounds are all so small, and so ordinary, and so kind, that they seem to be tucking the whole town in.`,
+`You look up at the windows, and you think about the lives behind them. A child is asleep, with one foot sticking out of the covers. An old man is doing a crossword, with a little frown. A woman is watering a plant in the dark, humming to it. A student is falling asleep over a book. Each one of them is the centre of their own world, and each of those worlds is as large as yours.`,
+`There is a feeling that comes sometimes, late in the evening, when you are sitting alone in a place full of sleeping people, and it is a feeling of being very softly held, by something that has no face. It is not loneliness, and it is not company. It is somewhere in between, a kind of belonging, to the whole town, and the night, and all the ordinary lives going quietly on. You let it settle over you, like a shawl.`
+]},
+sky: F => { const { E, P } = cx(F); return [ ARRIVE[F.a].sky,
+`You stand there, high up, and breathe in the wide, cool, thin air, and it feels, somehow, cleaner than any air you have ever tasted. It smells of nothing, or of everything very faint and far away: cold stone, distant water, the green memory of grass. There is a breeze, very light, that touches your hair, and your face, and passes on, as if it had only stopped for a moment to see who you were.`,
+`Above you, the sky is enormous, and entirely full. There are more stars than you could count in a hundred nights. Some are bright and white, and some faintly golden, and some a pale, cold blue. They lie in clouds and rivers and thin, scattered threads, and in the middle of them all, a long, faint, milky road runs across the sky from one edge to the other, like a path of spilled flour.`,
+`That road is the galaxy, which is the home of all the stars you can see, and of billions more that you cannot. It is the great, slow wheel in which the sun, and the world, and everyone you have ever met, are quietly turning. You are looking at it from inside, the way you look at a city from the middle of a square. It is so big that it is hard to hold in the mind. It is also, tonight, perfectly peaceful.`,
+`The moon sits low, a little to one side, large and pale and calm, and its light falls over everything like a fine, cool dust. It makes silver of the ${P.ground}, and silver of your hands, and silver of the long shadow that stretches out behind you, quite still, as though it, too, were resting. The moon does not say anything. It never has. It simply keeps watch.`,
+`You find the old shapes, one at a time, the way you find the faces of friends in a crowd. There is the Plough, tipped on its side, like a ladle. There is the long, slow W of a queen on her chair. There is a faint, hazy smudge that is a whole city of stars, seen from very far away. Each one has been given a name, by many people, over many thousands of years, and each of them was looked at, at night, by someone who was feeling small.`,
+`Very high, and very far, a point of light moves slowly across the dark, a small, steady, unblinking one, carrying someone, perhaps, or something, from one side of the sky to the other, in perfect silence. You follow it, until it dips behind a bank of cloud, and then, a long while later, you realise that you have been watching an empty patch of sky, and that you do not mind.`,
+`And then, suddenly, a thin white thread is drawn across the dark, from one corner of the sky to the other, there, and gone, a falling star. It is over so quickly that you are not certain that you saw it, and yet you are, perfectly. A tiny grain of dust, perhaps no bigger than a seed, burning up in the high air, as it has done for a billion years. You make a wish, without knowing what it is.`,
+`It is good to feel small, sometimes. It is good to stand under a sky that has no edges, and know that you are only a small, warm, breathing part of something enormously vast, and that the something is not unkind. You feel it settle over you, a deep, soft, safe smallness, like a very small boat on a very large and very calm sea. Your eyes begin to close, and the stars do not mind at all.`
+]}
+};
+
+/* ---------------------------------------------------------------- THE COMPANION: who is beside you (about 800 words each) */
+W.MOD.comp = {
+guide: F => { const { E, P } = cx(F); return [
+`You are not alone for long. Somebody is coming toward you, ${P.way}, slowly, with the unhurried walk of someone who has never in their life been late for anything. It is ${E.elder}, and as they come closer, you see that they are smiling, a small, calm, welcoming smile, as if they had been expecting you for some time, and were pleased, but not at all surprised, that you had come.`,
+`They stop, a few steps away, and look at you, and the look is very kind, and very clear, and it goes right through you, and finds nothing there that it minds. Good evening, they say, in a low, slow, comfortable voice, like a fire that has been burning for hours. You have come a long way. Would you like some company? It is a very long night, and a very good night, and it is nicer shared.`,
+`You say that you would. It is easy to say. It is the easiest thing in the world to say, to someone who is so plainly good. They nod, as if you had said the one right thing. Then they fall into step beside you, and you walk together, side by side, not talking, for a little while, and the quiet between you is full, and warm, and entirely without strain.`,
+`${cap(E.eldern)} walks very slowly, and as they walk, they look at everything. They look at the stars, and the ground, and a snail, and a leaf, and a patch of moonlight, as though all of it were new, and as though each thing, no matter how small, deserved to be looked at properly, and for as long as it needed. You find that you are looking too. You see more than you did a minute ago.`,
+`I have walked this way for a great many years, ${E.eldern} says, and I have noticed that the best things happen when you are not trying. If you hurry, they slip away. If you wait, and breathe, and let the night go by at its own pace, they come to you, one at a time, like deer coming out of a wood. Nothing needs to be chased. The world is generous, and slow, and always giving.`,
+`They stoop, with a small, creaking sigh, and pick something from the ground: a smooth, round pebble, about the size of an egg, grey, with a single white line across it, like a ring. They turn it over in their fingers, and hold it out to you. This is for your pocket, they say. Whenever you feel the world going too fast, hold it, and feel how heavy it is, and how still. It will remind you.`,
+`You take it, and it is cool, and heavy, and perfectly smooth, as though it had been rubbed, for a thousand years, in someone's patient hand. You close your fingers round it, and a feeling comes up from it, through your palm, and your arm, and into your chest, a deep, slow, steady stillness, like the bottom of a well. You put it in your pocket, and it sits there, warm now, and quiet.`,
+`${cap(E.eldern)} looks at you sidelong, and there is a twinkle in their eye. Now, they say, I do not know what the night has in store for us. It may be a great deal, or only a little. But I will tell you one thing I have learned: whatever comes, whatever it gives, you will be able to meet it. You are better at that than you think. Shall we go on?`,
+`You nod, and your guide nods back, and the two of you go on together, slowly, into the night. The sound of your steps is soft, and even, and very nearly the same, so that it sounds, from a little way off, like one person, walking. And you feel, at last, completely accompanied, and perfectly safe, and entirely free to let go of whatever you were still holding.`
+]},
+dear: F => { const { E, P } = cx(F); return [
+`You are not alone for long, because somebody is coming toward you, ${P.way}, and you know who it is before you can see their face. You know the way they walk. You know the shape of their shadow. It is someone dear to you, someone whom you would know in the dark, in a crowd, in a dream, and they have been looking for you, and they are smiling, because they have found you.`,
+`They do not say anything at first. There is no need. They simply come and stand beside you, close, in the way of people who have stood beside each other many times, and you feel the warmth of them along your arm and shoulder, a steady, ordinary, miraculous warmth, like the warmth of a loaf of bread, or of a cat, or of a hand held out in the cold.`,
+`Then they say, quietly, I had a feeling you would be here. It is such an easy, familiar thing to say, and it goes into you like warm water. You smile, and say that you had a feeling, too. And you both laugh, very softly, at nothing at all, the small laugh of people who are at ease with each other and who have no need to explain it.`,
+`You begin to walk together, side by side, and your steps fall into time, without either of you trying. Your dear one looks about with bright, curious, gentle eyes, and points out things that you might have missed: a spider's web, strung with dew, like a tiny chandelier, a pale moth sitting on a leaf, a single lit window, very high up, like a star that has come down to rest.`,
+`You have not got to say anything. You have not got to be anyone. That is the best of it, with someone you love: there is a point at which you can stop trying, and simply be there, as you are, with your hair untidy, and your thoughts unfinished, and be, quite entirely, liked. It is a kind of rest, and it is deeper than sleep, and you sink into it like a stone into a warm pond.`,
+`They tell you, in a low voice, about something that happened to them today, something small, which they thought of telling you at the time. A funny word, a kind stranger, a bird on a wire. You listen, and the story goes on in the dark, a thread of gentle sound, and you realise that you have not heard a story told so simply, and so well, for a very long time. It does not matter that nothing much happens in it.`,
+`Then they fall quiet, and you walk a little way, and you glance sideways at them, and they glance at you, and you both look away, smiling, and the smile goes on a long time. And their hand finds yours, as if by accident, and you hold it, and neither of you says a word. It is warm, and a little rough, and perfectly the right size. You feel your whole body let go.`,
+`You think: this is what it is for. All the walking, and the working, and the worrying, and the day, it is all so that, at the end, one can be somewhere quiet, with someone who is glad that one has come. The night is going to be long, and strange, and full of small wonders, and you are going to meet them all hand in hand. And that is more than enough. That is everything.`
+]},
+animal: F => { const { E, P } = cx(F); return [
+`You are not alone for long. Something is coming toward you, ${P.way}, very softly, and you stop, and wait, and it comes out into the light. It is ${E.petAdj}, and it looks at you for a long moment, with great, dark, thoughtful eyes, and then, quite gently, it walks over and leans its whole warm weight against your leg, and sighs.`,
+`You crouch down, slowly, so as not to startle it, and hold out your hand. It sniffs your fingers, politely, one at a time, as if reading a very short letter. Then it pushes its head into your palm, and the head is warm, and soft, and a little damp, and you scratch it, gently, behind the ear, and it closes its eyes, and leans into your hand, and a deep, slow, happy, rumbling sound comes out of it.`,
+`This is not an animal that belongs to anyone. You can tell. It has the calm, self-possessed look of a creature that belongs to itself, and has decided, for reasons of its own, that tonight, it would like to belong to you, a little. It is a great compliment. You do not take it lightly. You say, in a low voice, that you would be very glad of its company, and ${E.petn} flicks an ear, as if to say, good.`,
+`You stand up, and begin to walk, and ${E.petn} falls into step, a pace or two behind, and then, as it grows bolder, beside you. Its feet make a soft, steady, pattering sound, and its breath makes a small cloud in the cool air, and now and then it stops, to sniff at something very interesting, and you wait, because there is no hurry, and the thing is, in fact, interesting.`,
+`${cap(E.petn)} is a very good guide to the night. It shows you things you would otherwise have missed: a hollow, where a family of mice sleep in a heap, a patch of earth that smells of rain, a leaf that moves, with no wind. It is not clever, in the way that people are clever. It is attentive, which is better. It notices, and it is calm, and it lets things be what they are.`,
+`After a while, it stops, and sits down in a patch of moonlight, and looks at you expectantly, and you realise that it wants you to sit, too. So you do. You sit on the ground beside it, and it leans against you again, and together you look at the dark, and the stars, and the shapes of things. Its warmth goes into your side, and its slow breath goes in and out, in and out, and you begin, without trying, to breathe in time with it.`,
+`There is something wonderfully simple about being with an animal. It does not want you to be anything. It does not need you to talk. It asks only that you stay a while, and be kind, and be warm, and that, when the time comes, you lie down. It has never heard of tomorrow, or of yesterday, and has no use for either. It lives in the long, warm, present moment, and tonight, it invites you in.`,
+`${cap(E.petn)} yawns, a great, wide, pink yawn, with a little squeak at the end of it, and shuts its mouth with a click, and looks, for a moment, so absurdly sleepy and pleased with itself that you laugh, quietly, in the dark. It blinks at you, slowly, which is the way of saying, I trust you. You blink back, slowly. And then, side by side, you get up, and go on.`
+]},
+alone: F => { const { E, P } = cx(F); return [
+`You walk on by yourself, and it is not a lonely thing. It is, in fact, one of the great quiet pleasures: to walk in the night without anyone to talk to, or listen to, or take care of, or be careful of, with nothing to do but be, and to let your thoughts go wherever they like, like sheep let out onto a hill. There is nobody here but you, and the night, and the night is on your side.`,
+`You notice that you have stopped thinking in sentences. The words have fallen away, one by one, the way the leaves fall in autumn, and what is left is simply looking, and feeling, and hearing: the cool on your face, the stars above, the sound of your own steps, going on, steady and soft, like a very slow clock. It is a clean, plain, empty-handed feeling, and it is good.`,
+`There is a particular quality to the silence when you are alone and at ease. It is not the silence of an empty room. It is the silence of a full one, full of small sounds that you can finally hear: your own heartbeat, your own breath, the faint, rushing whisper of the blood in your ears. They are the sounds of being alive, and you have not listened to them for a long time. You listen to them now.`,
+`${cap(E.hum)} comes and goes, in the distance, like a thought that does not quite arrive. You find that you are not trying to place it, or to follow it, or to understand what it means. It is simply there, and then it is not, and you let it go, and it goes. It is easy. It is so much easier than you remember. All you have ever had to do was open your hand.`,
+`You look up. The stars are out in their thousands, and for the first time in a long while, you let yourself really look at them. Not to name them, or to count, or to learn anything. Just to look. They look back, in their way. They are very old, and very patient, and they have seen a great many people stand just as you are standing, with their faces turned up, and their hearts, for a moment, wide open.`,
+`You talk to yourself, softly, in your head, the way you would talk to a child you were putting to bed. You have done well today, you say. You did what you could. Some of it was good, and some of it was not so good, and all of it is over. There is nothing to be done about it now, and nothing to be afraid of. You are tired, and that is all right, and soon you will rest.`,
+`It is surprising how much kindness there is, in the end, in your own company. You say a gentle word to yourself, and you find that you believe it, and it settles in you, like warm tea. You walk a little taller, and a little slower, and you are, quite suddenly, glad of yourself, in a way you have not been for some time. It is a peaceful gladness, with no edges.`,
+`You pause, and place a hand flat on your chest, and feel your heart, going on, and on, doing its small, faithful work, beat by beat, without being asked. It has done this every moment of your life, and it has never once complained. You thank it, silently. It goes on beating, steady and slow, and you feel a great, quiet tenderness for the whole warm, tired, hopeful, ordinary shape of you.`,
+`Then you walk on, by yourself, under the stars, and you are not alone at all. The night is with you, and the stars, and the ground under your feet, and every breathing thing that sleeps along the way. You are part of it all, a small, bright, patient part, and you are exactly where you should be. You do not need anyone, tonight, and yet you are, in every way that counts, accompanied.`
+]}
+};
+})();
+
+</script>
+<script>
+/* WHATEVER COMES, WHATEVER GIVE — part 3: the heart of the story. Four kinds of tale, each told in two halves (about 1,800 words each). */
+(function(){
+const G = globalThis.G, W = G.wcw, cx = W.cx, cap = W.cap;
+
+/* a few more words that change with the age you chose */
+Object.assign(W.ERA.present, { scope:'a battered brass telescope on a tripod', blanket:'woollen blanket', pot:'big pot of soup', table:'long wooden table', wickup:'a box of matches', pair:'two' });
+Object.assign(W.ERA.ancient, { scope:'a long wooden sighting-tube, notched at each end, on a stand of three sticks', blanket:'woven blanket', pot:'big iron pot of pottage', table:'long trestle table', wickup:'a flint and steel', pair:'two' });
+Object.assign(W.ERA.future,  { scope:'a slim instrument that unfolds in the hand and listens to the sky', blanket:'thermal blanket', pot:'big warm tureen of soup', table:'long, low table', wickup:'a tiny spark-cell', pair:'two' });
+Object.assign(W.ERA.dream,   { scope:'a spyglass made of rolled-up night', blanket:'blanket of folded cloud', pot:'big copper pot of starlight stew', table:'long table of polished moonwood', wickup:'a single warm spark', pair:'two' });
+W.ERA.dream.cloak = 'long, soft cloak';
+
+W.MOD.heartA = {
+
+/* ------------------------------------------------------------------ SCIENCE, first half */
+science: F => { const { E, P, C } = cx(F); return [
+`Ahead of you, on ${P.here}, there is a small, warm light, and a figure bent beside it, quite still, in the way of someone who is concentrating very hard on something very small. As you come closer, you see that it is ${E.sage}. Beside them stands ${E.scope}, pointed at the sky, and on their knee is ${E.note}, covered with rows of tiny, neat numbers, written with ${E.pen}.`,
+`They are murmuring to themselves, softly, in a steady, sing-song way, like someone counting sheep. Four, they say, and then, after a long moment, five, and then, six. You stand and wait, and do not speak, because it would be a pity to break the count. At last, they look up, and blink, and smile, and say, oh. A visitor. How very nice. I am afraid you have caught me measuring.`,
+`You ask what they are measuring. They look slightly embarrassed, and slightly delighted, in the way of someone who has been asked their favourite question. Light, they say. Just light. How long it takes to get here. It is the sort of thing that a person can spend a lifetime on, and never come to the end of, and never grow bored. Would you like to see? It will not hurt. It is a gentle sort of science.`,
+`${C.l[0]}`,
+`They pat the ground beside them, and you sit down, and they begin, in a low, slow, easy voice, as one might tell a bedtime story. Look at the moon, they say. You look, and there it is, pale and round and close. That light, they tell you, is not coming from the moon, exactly. The moon makes none of its own. It is the light of the sun, bounced off the moon's grey face, and sent down to you, and it takes a little over one second to arrive.`,
+`So when you look at the moon, you are seeing it as it was just over a second ago. Not now. A moment before now. It is the smallest piece of the past that you can look at, and you are looking at it all the time, and nobody ever told you. You give a small, surprised laugh. It is rather a lovely idea, that the moon is always a tiny bit behind, like someone running to catch up.`,
+`The sun, they go on, is much further, so its light takes much longer: about eight minutes. If the sun were to go out, this very moment, we would not know for eight whole minutes, and we would go on sitting in its warmth, and walking in its glow, and never guess. The sun you saw this afternoon, on the wall, on your hands, was the sun of eight minutes before. It is a sort of friendly time-travel, they say, and everyone does it, every day, without noticing.`,
+`Then they point, with one finger, at a small, steady, golden star, low in the sky. And that one, they say, is a great deal further. That light has been travelling for years. Many years. It left that star long before you were old enough to walk, and it has crossed all that space, through the cold and the dark, quite alone, quite patiently, at the fastest speed that anything can go, and it has arrived tonight, in your eye, just now.`,
+`You look at the star, and you feel something strange, and quiet, and large, move through you. It is a letter, you think. A letter from long ago, and from far away, and it has been sent without any hurry, and delivered, without any fuss, to you. Nobody has ever opened it before. You are the first. They hand you ${E.pen}, and they hand you ${E.note}, and they say, would you like to write down what it says?`
+]},
+
+/* ------------------------------------------------------------------ ROMANCE, first half */
+romance: F => { const { E, P, C } = cx(F); return [
+`Ahead of you, on ${P.here}, someone is standing quite still, holding a ${E.lantern} up at the dark. They are looking ${P.view}, a long way, at something that is not there, or not yet, and the light of the lamp falls on their face, and on their hands, and on the careful, patient, hopeful line of their shoulders. They do not hear you coming. All of their attention is turned somewhere else, far away.`,
+`You stop, a little distance off, so as not to startle them, and you wait. After a while, they sigh, and lower the lamp a little, and then raise it again, slowly, from side to side, in a small, clear, deliberate arc, once, twice, three times. It is a signal. It is the way you wave to someone who is too far for waving. And they stand, and watch, and wait for an answer.`,
+`Nothing answers. The dark ${P.view} stays dark. They give a small, quiet, tired sort of smile, and say, to nobody, there. Perhaps tomorrow. Then they notice you, and are not at all embarrassed. It is a thing about people who are in love, that they have long since given up being embarrassed about it. Good evening, they say. You must forgive me. I am waiting for a light.`,
+`${C.l[0]}`,
+`They tell you, in a low, warm voice, how it began. There is someone, they say, a long way off, ${P.view}, whom they have loved for a long time, and who has loved them. They met on a night just like this, under a sky just like this one, and they have been very happy, and then, as happens, the two of them were called away to separate places, and now there is a great stretch of dark between them.`,
+`But they have a custom. Every night, at the same hour, one of them lights a lamp, and lifts it, and sways it, three times, and the other, far away, sees it, and lights their own lamp, and lifts it, three times, in answer. And that way, each of them knows that the other is well, and thinking of them, and that the night is not as long, nor as lonely, as it might have seemed. It has never failed, not once, in all this time.`,
+`Until tonight, they say. Tonight, the answer did not come. They say it lightly, but their hand tightens, just a little, on the handle of the lamp. It might be nothing, they say. A cloud. A tired eye, a window shut. A lamp that has run out of oil, or a spark that will not catch. There are a hundred small reasons, all of them harmless. And still, I would like to know.`,
+`They turn, and look at you, and it is a long, steady, questioning look, and you find that you already know what they are going to ask. Would you, they say, very gently, carry something to them? I would go myself, but if I leave my lamp, and the answer comes, I will not see it. And I do not like to leave it unlit. It is a small thing. It would not take long. I would be so very grateful.`,
+`They open their palm, and in it lies ${E.gift}, small, and light, and carefully kept, the kind of thing that costs nothing at all, and means everything. Tell them, they say, that I am here. That is all. That the lamp is lit, and I am here. You close your hand round the little token, and it is warm from theirs, and you say that you will. They smile, and it is like a lamp being lit.`
+]},
+
+/* ------------------------------------------------------------------ MYSTERY, first half */
+mystery: F => { const { E, P, C } = cx(F); return [
+`It begins with a sound. You are walking, ${P.way}, quite alone with your thoughts, when you hear it, very faint, and very far, from somewhere ahead: a soft, low, droning hum, rising and falling, like the voice of someone singing to themselves, with their mouth closed, in another room. You stop, and tilt your head, and it is gone. You hold your breath, and it comes again, a little nearer.`,
+`It is not a machine. It has too much breath in it. It is not an animal, for it has a tune, a simple, circling, comfortable tune, that goes up a little, and down a little, and rests, and begins again. You find that you know it, though you have never heard it before, in the way you know the shape of your own front door in the dark. It is the sort of sound that makes a room feel safe.`,
+`And you remember that you have heard it before: not here, but in other places, on other nights, a long while ago, when you were falling asleep. A hum, very faint, somewhere in the house, that you never thought about, and never asked about, and that was simply there, like the dark, like the ceiling. Somebody was always humming, a little, at the edge of your sleep. You had forgotten. And now it is here.`,
+`${C.l[0]}`,
+`You begin to follow it. You do not decide to. Your feet simply turn that way, as a plant turns toward the light. It is not a hard thing to follow, for the hum is steady, and kind, and never loud. But it has a trick: whenever you come close, it grows fainter, and when you stop, it grows clear again, as though it were shy, and wished only to be heard, and not to be found.`,
+`There are small signs, along the way, if you look for them. A warm patch on a cold stone, as though someone had been sitting there, and had only just left. A little scatter of seeds, such as one might drop from a pocket. A thread, caught on a branch, soft and grey. A cup, set on a wall, with a little tea still warm in it. Somebody has been here, and has been looking after things, in their own quiet way.`,
+`You find, on a post, a small hand-painted sign, very faded, which says, in careful letters, do please be quiet, someone is sleeping. And you see that it is not meant for you at all. It is meant for the world. It has been hung up, long ago, by someone who wished everyone to be able to rest, and who had no other way of saying so. You walk on more softly. You are suddenly very fond of whoever it was.`,
+`The hum is stronger now, close enough that you can feel it in the air, a slow, warm, vibration, like the purr of something large and kind. Ahead of you, at the end of ${P.way}, there is a small, round, glowing window, the colour of honey, and the hum is coming from there. You are very near. Your heart is beating a little faster, though it is not fear, but something softer, a kind of hope. You step forward, quietly.`
+]},
+
+/* ------------------------------------------------------------------ FRIENDSHIP, first half */
+friend: F => { const { E, P, C } = cx(F); return [
+`You come, ${P.way}, upon a scattering of ${E.folk}, and you see at once that something is wrong, though it is only a small thing. They are not sleeping. Here, in the middle of the night, when everything else is quiet, they are sitting at their windows, or on their doorsteps, or at the edges of their beds, wrapped in blankets, looking out at nothing. Nobody is unhappy, exactly. They are simply wakeful, and alone, and a little lost.`,
+`There is an old man, sitting with his hands round a cold cup. There is a young woman, at a window, with her chin on her arms. There is a boy, in his pyjamas, on a step, counting the stars, and losing count, and beginning again. There is a woman, who has been awake with a baby, who is now awake without one, and does not know quite what to do with her hands.`,
+`Each of them is in their own small, separate circle of light, like islands in a dark sea. They can see one another, across the way, and nobody waves, because it is late, and one does not like to disturb. And so each of them sits, and looks, and wishes, a little, that somebody would knock at the door and say, I could not sleep either. Shall we have something to eat?`,
+`${C.l[0]}`,
+`And it occurs to you, quite simply, that you could be that somebody. It is such a small, obvious idea that you are surprised it has not been thought of before. You have, in your hands, or you can find, or you can borrow, the ordinary makings of a kindness: a light, a warm thing to eat, a seat. There is nothing in it that needs to be clever. It needs only to be done.`,
+`You knock, softly, at the nearest door, the old man's, and wait. A long moment. Then it opens, a crack, and a pair of tired, surprised eyes look out. You say, quite quietly, that you could not sleep, and wondered whether he could not, either. And a slow, creased, astonished smile comes over his face, as though somebody had given him a present. Come in, he says. Come in. I have only got tea. And then, apologetically, and a little hopefully, and some ${E.bread}.`,
+`So you go in, and sit, and he pours the tea, and it is hot and sweet and strong, and the ${E.bread} is soft, and good, and you eat it together without saying a great deal. At last he says, I have not had company in the night for a long time. It is a surprising thing, he says, how much the dark is improved by a second cup. You agree that it is. You say that it is a pity there are not more people awake.`,
+`And he says, slowly, why, there are. He lifts his chin toward the window, and you look out, and see them: all those other little lights, across the way, each one an island, each one a person, wakeful and alone. A thought is forming, a warm, round, simple thought, in both your heads at once. He puts down his cup. Well, he says. It is a fine night. Shall we go and knock?`
+]}
+};
+
+W.MOD.heartB = {
+
+/* ------------------------------------------------------------------ SCIENCE, second half */
+science: F => { const { E, P, C } = cx(F); return [
+`You write it down, slowly, in your own best hand: one star, golden, low, very old light, arrived tonight. It looks very small on the page. And yet as you write it, you feel a sort of warmth in the writing, as if you had put your name to something true. ${cap(E.sagen)} reads it over your shoulder, and nods, and says, that is exactly right. You have just made a real observation. Congratulations. You are a scientist.`,
+`They are quiet for a little. Then they say, in a lower voice, and almost shyly, may I tell you the loveliest thing I know? You say that you would like that very much. They put down ${E.pen}, and turn to face you, and their face in the light is gentle, and full of wonder. Everything in you, they say, was made in a star. Everything. You, and me, and this ground, and that tree.`,
+`Long, long ago, before the sun, before the world, there were stars that were not our stars, and they burned, for millions of years, and in their hearts, very slowly, they made the heavier things: the iron that is in your blood, the calcium that is in your bones, the carbon that is in every leaf, and every breath. And when those old stars came to the end of their lives, they scattered it all across the dark, like a sower scattering seed.`,
+`And the seed gathered, in time, and became the sun, and the planets, and the sea, and the hills. And the hills became soil, and the soil grew grass, and the grass became a deer, and the deer became, in the way of things, a part of someone you know, and someone you know became, in the end, you. You are made, they say, quite literally, of old starlight, that has learned to think, and to wonder, and to look up.`,
+`${C.l[1]}`,
+`You look at your hands. They look the same as always. A little chewed at the nails, a little scratched. And yet they are made of something that burned, for a very long time, inside a star, and was thrown out into the dark, and waited, and was gathered up, and made into this. You turn your hands over, slowly, in the lamplight, and you feel an enormous, quiet respect, for the oldest, strangest, most ordinary things.`,
+`Now, they say, brightening, I will show you a trick that is not in any book. Do you see that very faint star, just there, which you can hardly make out? Do not look straight at it. Look a little to one side. A small way to the left, as if you were not interested. You try. And there, to your astonishment, the faint star leaps out, brighter, clear, and real, just at the edge of your sight.`,
+`It is how the eye works, they explain. The middle of the eye is good with colour, and detail, but the edges are better at catching the very faintest light. So the way to see the faintest things is to stop staring at them, and glance away, and let them come to you. You try it again, with another star, and another, and the sky begins to fill, as you look aside, with hundreds of tiny, patient, glimmering points you had never noticed.`,
+`It is a gentle lesson, and it is not only about stars. The more you strain, they say, the less you see. The more you rest your eyes, and breathe, and look softly, and let go, the more the night offers you. You rest your eyes. You breathe. And the sky grows rich, and deep, and so full of faint, shy light that you feel you could dive into it, and swim, and never reach the bottom.`,
+`${cap(E.sagen)} closes their notes, with a small, contented sigh. The sky will keep the figures, they say. It always does. It is the oldest library there is, and every book in it is written in light, and nobody has ever read them all. And tonight, you and I have read one more page. That is quite enough for one night. You feel the knowledge settle over you, soft and wide, like a quilt that has been warmed by a fire.`,
+`They yawn, a long, shy yawn, behind one hand, and laugh at themselves. Even scientists, they say, have to sleep. It is the first rule of good work. A tired eye sees nothing, and a rested one sees the whole sky. They hold out their hand, and you shake it, and it is dry, and warm, and a little ink-stained. Thank you, they say, for being curious. It is the best thing a person can be. Goodnight.`
+]},
+
+/* ------------------------------------------------------------------ ROMANCE, second half */
+romance: F => { const { E, P, C } = cx(F); return [
+`So you go, ${P.way}, carrying the little token carefully in your closed hand, and keeping your eyes on the far dark, where the answering light ought to be. It is a long way, and a quiet one. The night is soft and slow around you, and every so often you look back, over your shoulder, and see the lamp that you have left behind, a small, patient, golden star, steady in the dark, getting smaller, and never going out.`,
+`${C.l[1]}`,
+`You pass many things on the way, and none of them hurry you. You pass a sleeping field, and a still pond with the sky in it, and a gate that creaks when the wind touches it, as if someone were saying, hello, hello. You pass a little shrine, with a single candle in it, left by some stranger, long ago. You say a quiet word to it, as you pass. It seems like the thing to do.`,
+`And all the way, you think about how strange and wonderful it is, to love someone so well, from so far away. To light a lamp, every night, and trust that, somewhere, in the vast dark, someone is looking at it. It is such a small flame, against such a large night. And yet it is enough. It has been enough for all this time. You find that your own heart has grown a little larger, as you walk, as though it were making room.`,
+`At last, ${P.view}, you see it: a second ${E.lantern}, standing in the dark, but not lit. It is only a shape, a pale outline against the blackness, and beside it, a figure sits, hunched, with their head in their hands, and a small unhappy pile of spent matches, or spent sparks, at their feet. They have been trying, you can tell, to light it, and it will not catch. It is a small disaster, and a very sad one.`,
+`You come up quietly, and they look up, startled, and their face, in the darkness, is tired and a little wet. They say, oh, forgive me, I did not hear you. I cannot make it light. Every night I have lit it, and tonight I cannot, the wick is damp, or the spark is weak, I do not know. And they will think, they say, that I have forgotten. They will think that I have stopped.`,
+`You say, gently, that nobody has thought any such thing. You hold out your hand, and you open it, and you give them the little token, still warm. And you say, very simply, the words you were given. That the lamp is lit. That I am here. A silence follows, long, and deep, and quite still. Then the stranger takes the token in both hands, and presses it to their face, and a sound comes out of them, between a laugh and a sob.`,
+`Then, with shaking fingers, they take your own ${E.lantern}, which you have brought, and with ${E.wickup}, between the two of you, you coax a flame from the dry wick. It catches, wavers, steadies, and grows. And the stranger stands, and lifts it, high, and sways it, slowly, once, twice, three times, ${P.view}, across all that long dark. And there, so far away it is hardly more than a pinprick, a golden spark lifts, and sways, three times, in answer.`,
+`The two lights dip, and rise, and dip, and rise, like two people waving across a wide river, with all of their hearts. You stand a little aside, and say nothing, and feel the night grow warm. And then the stranger is moving, hurrying, half-running, toward the far light, and the far light is moving too, coming toward them across the dark, from both sides at once, and the space between them is closing, closing, as the two lamps draw near.`,
+`You do not follow. It would not be right. Some things are for two people only. But you stand where you are, and you watch, until the two small flames meet in the middle of the great dark, and become, in a moment, one: a single, warm, steady, golden light, wide enough for two, shining out across the night. And you know, without being told, that it will not go out. You turn away, softly, smiling, with a lump in your throat, and let them have it.`
+]},
+
+/* ------------------------------------------------------------------ MYSTERY, second half */
+mystery: F => { const { E, P, C } = cx(F); return [
+`You come to a small door, low, and round, and old, with a brass handle worn bright, and beside it, the honey-coloured window, with a muslin curtain, and behind the curtain, a lamp. The hum is coming from inside, quite clear now, rising and falling, soft and sure. You lift your hand to knock, and stop, and listen, and decide, instead, to look. You move to the window, and part the curtain, very slightly, with one finger.`,
+`Inside, there is a small, warm, cluttered room, full of shelves, and cups, and cushions, and things that have been loved. In a deep armchair by the fire sits ${E.shy}, with a rug over their knees, and a book, open, upside down, forgotten on their lap. Their eyes are closed. Their face is round, and lined, and gentle. And their lips, very slightly parted, are making the sound: the slow, circling, comfortable hum.`,
+`${C.l[1]}`,
+`You stand at the window for some time, and watch. And gradually you understand. This person, in this small room, has been humming, every night, for a very long time, and has no idea that anyone can hear. They hum because it helps them to feel at peace, and because, somewhere, long ago, someone hummed to them. But the sound has floated out, through the glass, and the chimney, and the cracks in the wall, and gone out over everything, and made all of it, a little, safer.`,
+`And you realise that it is not only a sound. It is a kindness. Everyone who has ever slept soundly in this place has slept, in part, because of it. The hum is in the walls, and the pillows, and the dreams. It is what has made the dark feel friendly. It has been looking after everyone, all this time, quietly, for nothing, and no one has even known whom to thank.`,
+`The hum stops. The person in the chair stirs, and opens their eyes, and looks straight at the window, and at you. You freeze. And they do not cry out, or look afraid. They only sigh, a long, embarrassed sigh, and rub their face, and call, in a small, apologetic voice, you had better come in. I am so sorry. I hope I have not kept you awake. I do not like to be a bother.`,
+`So you go in, and sit on a cushion by the fire, and they bustle about, and give you tea, and a biscuit, and apologise for the mess. And at last you tell them, as gently as you can, what you have discovered. That they have not kept anyone awake. That the opposite is true. That everyone sleeps better for the sound. That nobody knows who it is, and that nobody has ever minded, and that you came all this way only to say, thank you.`,
+`They are silent, for a long moment, with their cup halfway to their lips. Then a very slow, wondering, incredulous smile spreads over their face, like dawn coming up. Oh, they say. Oh, I never thought. I thought it was only a silly habit. I thought, if anyone found out, they would laugh. A tear runs down the side of their nose, and they wipe it with a corner of their rug, and laugh, and it is a lovely, rusty sound, as though it had not been used for a while.`,
+`You sit together by the fire, and the shy person asks if you would like to hear it. Properly. Not through a window. You would, very much. So they settle back, and close their eyes, and begin, and it is the same slow, circling, upward-and-downward tune, but now it is for you, and you can feel the whole of it, warm, and deep, and quite without hurry. It goes into the room, and into the walls, and out through the windows, and over the whole sleeping world.`,
+`And somewhere, out there, as it goes, you imagine it landing on a thousand pillows, one by one: on the sleeper who was restless, and the child who was afraid of the dark, and the old woman who was missing someone. And you imagine them all, as it touches them, sighing, and turning over, and sinking, and falling quietly into a rest that was waiting for them all along. The mystery is solved. It was only ever love, in the shape of a tune.`
+]},
+
+/* ------------------------------------------------------------------ FRIENDSHIP, second half */
+friend: F => { const { E, P, C } = cx(F); return [
+`And so you go, the two of you, from door to door, and knock, softly. And at each door, there is the same small miracle: a tired face, a surprise, a smile. I could not sleep, you say, and neither, apparently, could this gentleman. Would you like to come and eat? And each time, after a moment's hesitation, because we are all a little shy of being invited, the answer is yes.`,
+`${C.l[1]}`,
+`They come out, one by one, in their coats, and their slippers, and their blankets, blinking, and rather pleased. The young woman, who was at the window. The boy, who was counting the stars. The woman with the empty arms. A man who was mending something small. A girl, with a cat. An old couple, who have been awake together, in two chairs, for hours, saying nothing, and are very glad of a reason to say something. Soon there is a little crowd, drifting along ${P.way}, murmuring, and yawning, and trailing blankets.`,
+`Somebody brings a ${E.pot}. Somebody carries bowls. Somebody has a loaf, and somebody a jar of jam, and somebody a single, very carefully wrapped cake, which has been waiting in a cupboard for a special occasion, and decides that this is one. And in ${P.here}, with a good deal of cheerful pushing and carrying, a ${E.table} is set up, and ${E.lanterns} are hung above it, and a cloth is spread, and benches pulled in.`,
+`It is not grand. It is only a table, and some light, and some food, and a number of people. But there is something about it that makes your heart lift, the way a heart lifts at the first note of a favourite song. Everyone has a place. Everyone has a spoon. The ${E.pot} is set down in the middle, steaming, and the smell of it rises into the night, warm, and rich, and as kind as a hand on the back of the neck.`,
+`They eat. At first, there is mostly the sound of spoons, and the small, contented noises of people who are hungrier than they knew. Then, slowly, there begins to be talk: low, and soft, and a little halting, at first. The old man tells about the winter when the river froze. The girl tells about her cat, who has never once caught a mouse, and is proud of it. The boy tells how many stars he got to, before he lost count. It is the largest number any of them has heard.`,
+`${C.l[2]}`,
+`Just when you think everyone has come, there is a small sound, at the edge of the light. Somebody is standing there, at the very rim, holding back: a thin, quiet person, whom nobody knows, a stranger, who has been walking, and has seen the lamps, and the table, and could not bring themselves to come closer. They look hungry, and tired, and as though they would like very much to be asked.`,
+`Nobody has to say anything. The old woman moves along the bench, and pats the place beside her. The boy fetches another bowl. The man who was mending something small takes off his scarf, and puts it round the stranger's shoulders. And the stranger sits, and is given soup, and is not asked a single question, and after a minute or two, begins, very quietly, to cry, and to laugh, and to eat, all at once. And the table, which was already full, makes room.`,
+`The lamps burn lower. The talk grows slower. One by one, as the soup warms them, and the tea goes round, and the night deepens, the guests begin to nod. A head goes down on folded arms. A boy slides sideways against his mother. An old man's chin drops, gently, onto his chest, and he begins to snore, a tiny, whistling snore, and nobody laughs, and everybody smiles. And you move quietly among them, with ${E.blanket}s, and tuck one over each sleeper, as you would over a child.`,
+`And when they are all asleep, round the long, warm table, in the soft light, with their blankets, and their bowls, and their hands, you sit for a moment, at the end of the bench, and you look at them. Strangers, an hour ago. Neighbours now. Nobody lonely. It was such a small thing, a knock at a door, and a cup of tea. And look what it has made. You feel a deep, round, golden happiness, like the glow of the lamps, and you let it fill you to the brim.`
+]}
+};
+})();
+
+</script>
+<script>
+/* WHATEVER COMES, WHATEVER GIVE — part 4: the four endings, the lullaby, and the assembly of everything into one long story. */
+(function(){
+const G = globalThis.G, W = G.wcw, cx = W.cx, cap = W.cap;
+const THEN = F => (F.b === 'friend' ? '' : cx(F).C.l[2]);
+
+/* ---------------------------------------------------------------- THE ENDING YOU CHOSE: how the night comes to rest (about 800 words each) */
+W.MOD.res = {
+joy: F => { const { E, P, C, T } = cx(F); return [
+`And now, quite without warning, you find that you are smiling. It began somewhere small, in the corner of your mouth, and has spread, slowly, all across your face, and down into your chest, and out to the tips of your fingers, until your whole self is smiling. You have been given something, tonight, and you know it. It is ${T.gift}, and it is yours to keep, and the thought of it is like a small, bright bell ringing inside you.`,
+`Somewhere nearby, a sound begins. It is only a few notes at first, played on something small and sweet, a pipe, or a fiddle, or a little drum, by somebody who could not help it. It is a quick, light, skipping tune, the kind that makes your foot tap before you have decided to tap it. It floats out, over ${P.here}, and into the night, and a window opens, somewhere, and a head leans out to listen.`,
+`Then, one by one, the ${E.folk} begin to come out. They come in their dressing gowns, and slippers, and tumbled hair, rubbing their eyes, and grinning, and following the music. Somebody has strung ${E.lanterns} between two posts, and they swing, and glow, gold and rose and green, like a necklace thrown across the dark. Somebody has brought a drum. Somebody has brought a child, on their shoulders, who is wide awake, and thrilled.`,
+`And then, without anyone starting it, there is dancing. It is not clever dancing. It is the kind in which nobody knows the steps, and everyone is a little bit too happy to mind. People sway, and spin, and clap, and bump into one another, and laugh. A very old person is whirled round, gently, by a very small one, and lets out a wheeze of delight. A dog runs in circles, barking, because it has been told that this is allowed.`,
+`${THEN(F)}`,
+`You are drawn in, of course. You could not stand at the edge of such a thing, and keep your feet still. Somebody takes your hand, and somebody takes the other, and you are spinning, slowly, then a little faster, under the swinging lights, and your head goes round, and the stars go round with it, and you are laughing, helplessly, the way you laughed when you were very small, and everything was a game.`,
+`There is food, too, in the way of such nights. Somebody has found ${E.bread}, and it goes round, in pieces, from hand to hand, and tastes better than it has any right to. Somebody has found a sweet, and cuts it up, very small, so that everyone may have a crumb. You eat, and dance, and eat, and the music goes round and round like a happy wheel, and the night seems to lean in, and smile along.`,
+`And then, as a sort of wonderful last thing, somebody lights a small, round lantern of paper, and holds it up, and lets it go. It rises, slowly, wobbling, into the dark, glowing like a small, orange moon. Then somebody lets go another, and another, until the air is full of them, drifting up, and up, over the rooftops and the trees, a hundred little lights floating into the stars, each one carrying away somebody's thanks.`,
+`You stand, with your head back, and watch them rise, and your breath comes soft and quick. You feel the joy go all through you, like warm, golden honey, from your scalp to your toes. And you think that this is what happiness is, after all: not a thing you get, but a thing you give away, and watch rise, and find that you have more of it afterwards than you had before.`,
+`And as the lanterns grow small, and the music slows, and the dancing turns to swaying, and the swaying to leaning, and the leaning to quiet, you feel the happiness change. It does not go. It only grows soft, like a lamp being turned down, still glowing, but now a gentle, sleepy glow, a warm place at the centre of your chest, where you will keep it, all night, like a coal banked down under ash.`
+]},
+calm: F => { const { E, P, C, T } = cx(F); return [
+`And now, quietly, the whole night begins to settle. It does not happen all at once. It is like the slow smoothing of a rumpled bed, a little at a time, with a long, gentle hand. The last small movement goes out of the air. The last small sound dies away, and is not replaced. And in the stillness, you feel ${T.gift} sink into you, quite softly, and lie down, like a cat on a warm cushion, and go to sleep.`,
+`The ${E.lamps} burn lower. They do not flicker, any more. Each one is a small, steady, patient flame, or glow, standing quite straight, in its own round pool of light. You look at one for a long time, and it does not ask you for anything. It is only there, like a friend who does not need you to talk. The glow lies on ${P.ground}, soft, and gold, and perfectly still.`,
+`Every living thing nearby seems to be breathing out. You hear it, in the leaves, and in the grass, and in the faint, deep, steady sigh of the earth itself. A bird, somewhere, shifts, and tucks its head under its wing, and is asleep. A moth folds itself, on a stem. A small animal curls up, nose to tail, in the dark. One by one, the day's last wide-awake things let go, and lie down in the great, soft, patient quiet.`,
+`${THEN(F)}`,
+`You find a place to rest. It is not far, and it is not difficult to find: a patch of ${P.ground}, just the right shape, as though it had been kept for you. You lie down, slowly, a little at a time, and feel it take your weight, with a sigh of its own. Your shoulders, and then your back, and then your hips, and then your legs, all sink, one by one, into the great, soft, supporting dark. Nothing is asked of you. Nothing at all.`,
+`You look up at the stars, and they are very still. They do not twinkle now, or seem to. They hang, each one in its own place, like small, white, patient candles in a very large window. You do not try to name them. You only let your eyes rest on them, and then let your eyes close, and then open, and then, a little more slowly, close, and the stars are still there, behind your lids, as small, soft, gold dots.`,
+`You breathe in, and the breath is long, and cool, and clean. You breathe out, and it is longer, and warm, and slow. You think of nothing in particular. A thought comes, and drifts across your mind, like a small cloud across the moon, and passes on, and does not leave a mark. Another follows it, and passes, too. There is nothing for them to catch on. Your mind is a wide, clear, empty sky.`,
+`And the quiet grows deeper. It is not an empty quiet. It is full, and round, and warm, like a bowl of still water, holding the whole of the night in it. Everything that has happened, and everything that has not, rests in it, gently, at the bottom, like smooth stones. You are not trying to remember any of it. You are not trying to forget. You are simply resting beside it, as one rests beside a quiet lake.`,
+`Time, you notice, has slowed down, and then slowed down again. A minute is as long as an hour, and an hour is no length at all. There is no clock, now, and no calendar, and no list. There is only this long, soft, slow moment, going on and on, and you in the very middle of it, like a seed in the warm dark earth, waiting, quite content, for nothing at all.`
+]},
+wonder: F => { const { E, P, C, T } = cx(F); return [
+`And now, the sky begins to change. It happens very slowly, so slowly that at first you think you are imagining it. The dark seems to deepen, and then to clear, as though some great, soft hand were wiping the glass. The stars grow brighter, and then brighter again, and more, and more of them come out, until the whole sky is blazing, and silver, and full, from edge to edge, with ${T.gift}, quite clear, in the middle of it.`,
+`You lie back, and look up, and everyone nearby does the same. You hear it, all around you, a long, soft, collective sigh. Nobody speaks. There is nothing that needs saying. Above you, the great pale river of the Milky Way has come into view, thick with stars, as wide as a road, and so bright that it casts a faint, silvery shadow of your hand on the ground.`,
+`Then, high in the north, a faint, pale-green glow appears, and slowly spreads, like a curtain being drawn across the sky. It trembles, and ripples, and lifts, and folds, in long, slow, silent waves, green shading to violet, violet to rose, and back again. It is as if the night were breathing in colour. You hold your own breath, for a moment, in sheer astonishment, and then let it go, in a whisper.`,
+`${THEN(F)}`,
+`And while you are looking, there is a streak of white, high up, and then another, and another, long thin lines of light drawn quickly across the dark, one after another, silent, and perfect. A shower of falling stars. They fall, and fall, from the same distant point in the sky, dozens, hundreds, each a tiny speck of dust, burning up with a brief, bright, beautiful flame, and then gone. The whole sky is raining light.`,
+`You make a wish, and then another, and then you forget to make any more, and simply watch. It is too much to wish upon. It is a gift that does not need wishing on. You lie there, with the long, bright, silent rain of light falling over you, and a feeling rises in you that has no name, a feeling bigger than happiness, and quieter than joy, a kind of vast, shining, grateful peace.`,
+`You think about how large the universe is. It is larger than you can think. And yet you are in it, a small warm part of it, lying on a small, round, spinning world, under a small, bright, burning sun, in one little corner of one enormous galaxy. The thought, which might have frightened you at another time, does not frighten you now. It feels like being a very small child, in a very large and very loving house.`,
+`${cap(E.chime)}, very softly, as if the sky itself had remembered something, and the sound is small, and clear, and silvery, and it seems to fit exactly into the shape of the silence. You feel your heart answer it. You feel that you are part of the sound, and part of the stars, and part of the dark between the stars, and that none of it is separate from you, or you from it.`,
+`Slowly, the lights in the sky begin to fade, as slowly as they came. The green curtain draws itself in. The falling stars grow fewer, and then there is only one, a last, small, silver thread, and then none. The great river of the Milky Way settles back to its quiet glow. And the wonder does not go. It sinks down, softly, into the deep places of you, and becomes a sort of calm, to be carried, all night, in the dark.`
+]},
+tender: F => { const { E, P, C, T } = cx(F); return [
+`And now, gently, a feeling comes to you, one that you have not been waiting for, and are very glad of. It is the feeling of being known. It rises up in you, slowly, quietly, like warmth rising from a bath: the feeling that somewhere, there are people who love you, and have always loved you, and who would be glad, on any night, to see you come in out of the cold. ${cap(T.gift)} has opened a door in you, and the warmth is coming through.`,
+`You think of home. Not the building, though perhaps that too. Home as a feeling: the particular light in a particular room, at a particular hour, the smell of a particular dinner, the sound of a particular voice calling you to come in. It comes to you whole, and very clear, in every small detail. You can almost reach out and touch it. You are surprised by how much you have missed it, and how near it has been.`,
+`And there, ahead of you, ${P.way}, in the dark, there is a light. It is a small one, in a window, and it is the warm, low, honey-coloured light of a lamp that has been left on for someone who is coming home late. You know, quite certainly, that it has been left on for you. You do not need to be told. A light left on is the oldest, quietest way of saying, I was thinking of you.`,
+`${THEN(F)}`,
+`You walk toward it, and each step is easy, and slow, and warm. The ground is kind. The air is soft. You pass the ${E.lamps}, and the shadows of trees, and each of them seems to lean toward you, to wish you well. There is no one on the road, and you do not feel alone. You feel accompanied by every good thing that has ever happened to you, all walking along, quietly, at your side.`,
+`You arrive, at last, at the door, and it is already a little open, with a thin bar of gold lying across the step. You push it, and it swings, without a sound. Inside, there is a chair, with a ${E.blanket} folded over its arm. There is a cup, set out, with something warm in it. There is a small, glowing lamp. Nobody is there, and yet the room is full, with the long, loving, patient shape of someone who has been waiting.`,
+`You sit, and pick up the cup, and it is warm in your hands, and sweet. You pull the blanket round your shoulders, and it smells like somebody you are very fond of. And then, without any warning, there are tears in your eyes, easy, quiet, grateful tears, that slide down your cheeks and do not hurt at all. They are what happens, sometimes, when you are finally allowed to put down everything you have been carrying.`,
+`You are a little sorry, too, that the night is nearly over, and that you will have to leave it. It has been so full of small kindnesses, and you would have liked to stay. But you understand, as the warmth steals through you, that you do not have to leave it. It is yours now. It is as much a part of you as your own name. You can come back to it, whenever you like, by closing your eyes.`,
+`And the lamp burns on, steady, and low, and golden, and the room grows softer around you, as though it were folding you into its arms. You lean your head back against the chair, and feel yourself, quite simply, held. Held, and known, and loved, and safe. There is nothing more to find, and nothing more to fear. You are home, and the night is a warm hand on your hair.`
+]}
+};
+
+/* ---------------------------------------------------------------- THE LULLABY: told last, whatever you chose (about 600 words) */
+W.MOD.closing = F => { const { E, P, C, T, M, title } = cx(F); return [
+`The story is nearly over now. It has been a long one, and a good one, and it has done everything it was meant to do. The music is growing softer, and slower, and further away, as music does at the very end of an evening, until it is hardly more than the memory of a sound, the way the warmth of a fire lingers in a room after the last flame has gone.`,
+`Feel how heavy you are. Feel how the bed, or the pillow, or the blanket, is holding you up, so completely that you could not fall if you tried. Feel your arms, and your legs, and your face, so loose, and warm, and quiet. There is nothing left to do. There is nothing left to hold. You may put it all down, now, whatever it is, and let the night take it from you, gently, like a tide.`,
+`Goodnight, to the place where the story found you, ${P.where}. Goodnight to ${E.when}, which was your home for a little while. ${F.d === 'alone' ? 'Goodnight, to the night itself, which kept you company the whole way.' : `Goodnight to ${C.n}, who walked beside you, and made the way so much lighter.`} Goodnight to all the small things you met, the lamps, and the stars, and the sleeping creatures, and the quiet, kindly people. They are all still there, in the dark, keeping watch.`,
+`And goodnight, ${title}. You were a good story, and you told yourself so well. You were made, tonight, from five small answers, and you will not be told quite like this ever again. But you will live on, a little, in the part of the mind where the best stories go, and perhaps, one night, on the edge of sleep, you will drift back to a corner of it, and the lamp will still be lit.`,
+`Whatever comes, you may be sure of this: you will be met. Whatever the days bring, and the nights, whatever is asked of you, whatever you are given, and whatever you must let go, there will be a light somewhere, in a window, and someone, a little way off, humming. The world is a kinder place than it sometimes seems, and it is always, always, very slowly turning toward the morning.`,
+`So let your breathing grow long. In, and out. In, and out. Let your thoughts go grey, and soft, and slow, like smoke rising from a chimney into a windless sky. Let them thin, and drift, and spread, and vanish. There is nowhere that you have to be, and nothing that you have to be doing, and nobody who needs anything from you until the morning.`,
+`The stars are shining, over everything, over all of us, very far away, and very kind. The moon is making its slow way across the sky. The world is turning, quietly, in the dark, and carrying you with it, on its long, smooth, endless journey toward the dawn. You are in the very middle of it, safe, and warm, and rocked, as a child is rocked in a cradle that is as wide as the world.`,
+`Sleep now. Whatever comes, whatever gives, you are held. You are held, and you are loved, and you are quite, quite safe. Sleep now, and sleep deeply, and sleep well. Goodnight.`
+]};
+
+/* ---------------------------------------------------------------- put it all together */
+const N = G.bedNodes.whatever;
+const artBy = {
+  world: { present:'belltower|🏙️', ancient:'meadowlamps|🏮', future:'starfield|🛰️', dream:'moongarden|✨' },
+  place: { water:'moonriver|🌊', wild:'owlwood|🌲', town:'belltower|🏘️', sky:'cloudharbor|⭐' },
+  type:  { science:'starfield|🔭', romance:'lighthouse|💛', mystery:'owlwood|🔍', friend:'moongarden|🍲' },
+  mood:  { joy:'meadowlamps|🎶', calm:'quietsea|🌙', wonder:'starfield|🌠', tender:'moonwindow|🏠' }
+};
+const T = F => W.TITLES[F.a][F.b];
+const seg = (id, next, text, art, extra) => { N[id] = Object.assign({ title: T, head: null, art, next, text }, extra || {}); };
+N.t_pre = { title: T, head: T, art: () => 'moonwindow|🌙', next:'t_world', text: W.MOD.prelude };
+seg('t_world', 't_place', F => W.MOD.world[F.a](F), F => artBy.world[F.a]);
+seg('t_place', 't_comp',  F => W.MOD.place[F.c](F), F => artBy.place[F.c]);
+seg('t_comp',  't_heartA', F => W.MOD.comp[F.d](F), F => artBy.place[F.c]);
+seg('t_heartA','t_heartB', F => W.MOD.heartA[F.b](F), F => artBy.type[F.b]);
+seg('t_heartB','t_res',    F => W.MOD.heartB[F.b](F), F => artBy.type[F.b]);
+seg('t_res',   't_end',    F => W.MOD.res[F.e](F), F => artBy.mood[F.e]);
+N.t_end = { title: T, art: () => 'moonwindow|🌙', end: F => 'The End of ' + T(F), text: F => W.MOD.closing(F) };
+})();
+
+</script>
+<script>
+/* WHATEVER COMES, WHATEVER GIVE — part 5: three more slow stretches that make every story at least forty-five minutes long:
+   a gentle head-to-toe settling before the tale, a rest on the way (told differently for each place), and a slow drifting-off before the last goodnight. */
+(function(){
+const G = globalThis.G, W = G.wcw, cx = W.cx, cap = W.cap;
+const N = G.bedNodes.whatever;
+
+/* ---------------------------------------------------------------- before the tale: letting each part of the body go, from the top of the head to the soles of the feet */
+W.MOD.settle = F => { const { E, P, C } = cx(F); return [
+`Before the story begins in earnest, there is one more thing to do, and it is the easiest thing of all. It is simply to let go, a little at a time, from the very top of you to the very bottom. You do not have to try. You only have to notice, and let each part grow heavy, and soft, and warm, and quiet. We will begin at the top of your head, and take as long as we like.`,
+`Feel the top of your head. Feel the skin there, and the hair, and the faint warmth of your own thoughts underneath. Let it grow soft. Imagine that a small, warm light is resting there, no bigger than a coin, gentle as a candle flame seen through a curtain. Let it rest, and let it slowly spread, like warm oil, down over your forehead, and smooth it, and smooth it, until every line is gone.`,
+`Let the warmth slide down, behind your eyes. Your eyes have been working all day, looking, and reading, and watching, and they are tired, and they have earned a rest. Let them sink back, into your head, as though they were two smooth stones, sinking into a pool of warm water. Let your eyelids grow heavy, and soft. They do not need to be held open. They are closing by themselves.`,
+`Let the warmth spread across your cheeks, and into your jaw. Unclench it. Let your teeth part, a little, and your tongue lie loose and heavy in your mouth, like a small sleeping animal. Let the muscles round your mouth go slack, so that your lips are soft, and just a little open, the way they are when you are fast asleep. Feel your whole face melt, like butter in the sun.`,
+`Now let the warmth flow down your neck, and into your shoulders, where so much of the day is kept. Let them drop. Let them sink, lower, and lower, as if somebody were gently lifting a heavy coat from them. Feel the weight go. And let it travel down your arms, over your elbows, and your forearms, and your wrists, until your hands are open, and loose, and as heavy as two warm stones.`,
+`Let the warmth fill your chest, now, and rise and fall with your breath. In, and it rises. Out, and it falls. Each time you breathe out, a little more of the day leaves you, like steam rising from a cup. Let it flow into your stomach, which is soft, and slow, and quiet, and into your back, which is held, and supported, and need not do any work at all.`,
+`Let it pour down into your hips, and your thighs, which are heavy as sandbags. Let it reach your knees, and loosen them, and your calves, and your ankles, and then, at last, your feet, and your toes. Feel your toes, each one, and let each one go. You are quite empty of effort, now, from the crown of your head to the soles of your feet, and filled, instead, with a deep, soft, slow, golden warmth.`,
+`Now, let us borrow the rhythm of the sea, which has been breathing, in and out, for longer than there have been lungs. Breathe in, slowly, for as long as a small wave takes to climb the sand. Hold it, softly, at the top, for as long as the wave takes to hang there, glittering. And let it go, slowly, for as long as the wave takes to slide back, hissing, down the shore, and sink into the sea.`,
+`Again. In, as the wave climbs. Hold, as it glitters. Out, as it slides away, and the sand drinks it up. You do not have to do it perfectly. There is no perfect. There is only the next breath, and then the one after, each of them a little slower than the one before, like a pendulum swinging down toward rest, until it hardly seems to move at all.`,
+`And again. In. Hold. Out. Notice that, at the bottom of each breath, there is a small, soft, silent place, where nothing is happening, and nothing needs to. Let yourself rest there, a moment longer each time, as one rests at the top of a gentle hill, before walking down the other side. In, and hold, and out, and rest. In, and hold, and out, and rest.`,
+`You are lying very still, and very heavy, and the heaviness is not a burden. It is a gift. It is the weight of someone who has done enough, for today, and may now rest. You sink into it, as a stone sinks into the bed of a river. The bed holds you. The river goes over you. And somewhere, very close, just beyond the edge of your sleep, a story is waiting to begin.`
+]};
+
+/* ---------------------------------------------------------------- a rest on the way, between meeting your companion and the heart of the tale */
+W.MOD.rest = {
+water: F => { const { E, P, C } = cx(F); return [
+`You stop for a while, ${P.way}, where the ground is firm and dry, and sit down, close to the water, and rest. It is not that you are tired, exactly. It is that the night has asked you to slow down, and you are glad to. You tuck your knees up, and put your arms round them, and look out across the wide, dark, shining surface, and let your mind go as smooth as it is.`,
+`${C.l[0]}`,
+`The water makes its small sounds. A fish rises, somewhere out in the dark, and falls back, leaving a ring that spreads, and spreads, and grows faint, and vanishes. A breeze combs through the reeds, and they bow, all together, and straighten again, like a congregation. The sky and the water meet, far out, in a line that you cannot see, and so the stars seem to go down, and down, into the world.`,
+`You pick up a small, flat stone from the sand, and turn it over in your fingers. It is smooth, and cool, and heavier than it looks. You hold it for a while, as you might hold someone's hand. Then you set it gently down again, in exactly the place where you found it, because it seems to belong there, and the night is not a night for moving things.`
+]},
+wild: F => { const { E, P, C } = cx(F); return [
+`You stop for a while, ${P.way}, in a place where the trees step back a little, and the moonlight comes down in a soft, wide, silver pool, and you sit on a fallen log, as smooth as a bench, and rest. It is not that you are tired, exactly. It is that the wood has a way of making you slow down, and you are glad to, and your breath goes out of you in a long, grateful sigh.`,
+`${C.l[0]}`,
+`All around you, the wood goes quietly about its night. A leaf falls, turning over and over, and lands without a sound. A twig creaks. Somewhere high above, an owl shifts on its branch, and settles its feathers, with a faint, dry, whispering rustle. The smell of the earth rises, and the smell of the moss, and a cool green breath comes down from the canopy, and passes over you, like a hand over a sleeping face.`,
+`You close your eyes, for a moment, and listen to the wood breathe. It has a rhythm, slow, and deep, and very old. The trees lean, and creak, and straighten, as the breeze comes and goes. The roots, below, are holding on to the dark ground, and the leaves, above, are holding on to the dark sky, and you, between them, are held, as a seed is held, in the middle of a warm and living thing.`
+]},
+town: F => { const { E, P, C } = cx(F); return [
+`You stop for a while, ${P.way}, in the shelter of a doorway, where a step has been worn into a gentle hollow by a hundred years of feet, and you sit on it, and rest. It is not that you are tired, exactly. It is that the town has a way of drawing you to a standstill, at this hour, and holding you there, as a hand holds a hand, and you are glad to be held.`,
+`${C.l[0]}`,
+`Above you, the roofs make a jagged, gentle line against the sky, and on the line, here and there, a chimney, or a weathervane, or a sleeping bird. From some open window, a wireless, or a loom, or a kettle, makes a low, comfortable murmur, and a shutter taps, now and then, against its frame, as if someone, a long way inside, were turning over in their sleep.`,
+`You watch a single moth, circling the ${E.lamp} at the corner, round, and round, and round, in loose, dreamy loops. It is not trying to get anywhere. It is only circling, for the pleasure of the light. You think that there is something good in that, in the circling for its own sake, and you let your thoughts circle, too, round and round, loosely, without arriving, for as long as they like.`
+]},
+sky: F => { const { E, P, C } = cx(F); return [
+`You stop for a while, ${P.way}, and lie down on your back, on ${P.ground}, with your hands behind your head, and rest. It is not that you are tired, exactly. It is that the sky is so wide, and so near, that it would be impolite to go on walking beneath it, without stopping to look. You lie there, quite still, and let the whole bright dark spread out above you.`,
+`${C.l[0]}`,
+`The stars do not move, and yet they seem to. If you watch one long enough, it appears to swim, and tremble, and slide, a very little, to the left, and then to settle. It is only your own breath, rocking you, and your eyes, rocking with it. You let them rock. You are a small boat, lying quite still, on a very large ocean of stars.`,
+`The moon is a little higher now, and a little whiter, and the stars near it have grown dimmer, as though the moon were a lamp, and they were the small lights of a town at the foot of a hill. You look at the dark shapes that lie across its face, the seas, and the old, quiet craters, and think of how many people have looked at them, and thought just what you are thinking: that it is a very peaceful thing to look at, and that you are not afraid.`
+]}
+};
+
+/* ---------------------------------------------------------------- the slow drifting-off, before the very last goodnight */
+W.MOD.drift = F => { const { E, P, C, M } = cx(F); return [
+`The story has come to its end, but you do not have to come to yours. There is a little more of the night left, and we will spend it slowly, in the quietest way we know. Let us breathe together, a few more times, and let each breath carry you a little further down, into the deep, warm, slow dark where sleep is waiting.`,
+`Imagine, if you can, a long, wide, shallow staircase, going down. It is carpeted in something soft, and grey, and deep, so that your feet make no sound at all, and on either side, a low rail of smooth, warm wood, which you may hold, or not. At the bottom, a long way down, there is a small, round, golden light, the light of a ${E.lantern} in a window, and you know that it is the light of a place where you are wanted.`,
+`You put one foot on the first step, and it is wonderfully easy. The stair gives a little, like moss, and you sink, a little, into the softness. With every step you take, the air grows warmer, and the sounds of the day grow smaller. By the fifth step, they are as faint as the sound of a radio, in the next house, on a summer evening, and by the tenth step, you cannot hear them at all.`,
+`You go down, and down, one slow step after another, and the stair curves, gently, to the left, and then gently to the right, and the light at the bottom grows larger, and warmer, and more golden. There are small, quiet doors along the way, each one closed, each one with a name on it, in your own handwriting: worry, and hurry, and tomorrow, and yesterday. They are all shut, for the night, and you walk past them, without a glance.`,
+`At the very bottom, the staircase opens into a room. It is a small, round, deep, warm room, with a floor of soft, pale sand, and a low bed in the middle, heaped with every blanket you have ever loved. The ${E.lantern} burns on a shelf, turned very low. The ceiling is the night sky, and the stars are very close. You cross the sand, and sit on the bed, and lie back, and it takes you in.`,
+`Breathe in, slowly, and count with me, if you like, though you do not have to. In, and one. And out, long, and slow. In, and two. And out. Each time you breathe out, let your body sink an inch deeper into the bed, as though the bed were a boat, and the boat were drifting out, quietly, from a small, calm, safe harbour, onto a wide, gentle sea.`,
+`In, and three. And out. The ${E.lamps} are growing dim, one by one, far behind you, like the lights of a town on the shore, when a boat has drawn away from it, down a long and silent river. They are small now, and warm, and gold, and they are saying goodnight, without any words. You say it back, in your mind. Goodnight. Goodnight.`,
+`In, and four. And out. The sky is wide above you, and every star in it is a little drowsier than before. They blink, slowly, like the eyes of children who are trying to stay awake, and failing. One by one, they close. The dark between them softens, and thickens, and grows as comfortable as a blanket drawn right up to your chin.`,
+`In, and five. And out. Your thoughts are very far away now. They are small, and grey, and slow, like clouds a long way off, drifting across the face of the moon, and they do not need to be followed. Let them go where they like. They will find their own way home, in the morning, when you are rested and ready for them.`,
+`In, and six. And out. Your breath is very long, and very slow, and there is a pause at the end of it, a soft, quiet, empty pause, like the pause between the swings of a pendulum, and you rest in the pause, and it is lovely, and nothing at all is wrong. In the pause, there is nothing to do. There is only the stillness, and the stillness is enough.`,
+`In, and seven. And out. You can hardly feel your body now. It is warm, and heavy, and faraway, as if it belonged to somebody else, somebody very well loved, who is being looked after, with great care, in a quiet room. You are only the quiet, sleepy light that rests inside it, like a small flame in a sheltered lamp, burning very low, and very steady.`,
+`In, and eight. And out. Everything is gentle. Everything is dim. Everything is far, and soft, and slow. The sounds of the night come to you from a great distance, like the sounds of a village heard across a lake: a dog, a bell, a door, a voice, all of them small, and sweet, and without any meaning, except, perhaps, that the world is going on, and is well.`,
+`In, and nine. And out. You are so nearly there. Just one more, now, and you may let go of counting altogether, and simply fall, as a leaf falls, from a high branch, on a windless night, turning slowly, over and over, in the dark, with nothing below you but the soft, warm, waiting ground. In, and ten. And out. And let go. Let go. Let go.`
+]};
+
+/* ---------------------------------------------------------------- slot them into the chain */
+const T = F => W.TITLES[F.a][F.b];
+const art = {
+  place: { water:'moonriver|🌊', wild:'owlwood|🌲', town:'belltower|🏘️', sky:'cloudharbor|⭐' }
+};
+N.t_pre.next = 't_settle';
+N.t_settle = { title: T, art: () => 'moonwindow|🌙', next:'t_world', text: W.MOD.settle };
+N.t_comp.next = 't_rest';
+N.t_rest = { title: T, art: F => art.place[F.c], next:'t_heartA', text: F => W.MOD.rest[F.c](F) };
+N.t_res.next = 't_drift';
+N.t_drift = { title: T, art: () => 'quietsea|🌙', next:'t_end', text: W.MOD.drift };
 })();
 
 </script>
