@@ -1,0 +1,99 @@
+<!doctype html><meta charset="utf-8"><title>story test</title>
+<body style="font:12px monospace;background:#111;color:#ddd;white-space:pre-wrap" id="out">running…
+<script>['engine', 'data_core', 'art', 'art_gr', 'regions', 'encounters', 'mini', 'story_act1', 'story_act2', 'story_act3', 'story_road1', 'story_road2', 'story_road3', 'story_finale', 'titles', 'data_cg', 'data_cg2', 'mini_cg', 'mini_cg2', 'data_gr', 'mini_gr', 'story_cg1', 'story_cg2', 'story_cg3', 'story_cg4', 'story_cg5', 'story_cg6', 'story_cg7', 'cg_risks', 'story_triggers', 'story_gr1', 'story_gr2', 'story_gr3', 'cg_order'].forEach(f=>document.write('<scr'+'ipt src="../js/'+f+'.js?t='+Date.now()+'"></scr'+'ipt>'));</script>
+<script>
+const out=[]; const log=s=>out.push(s);
+const params=new URLSearchParams(location.search); const NSIM=+(params.get('n')||40); const MODE=params.get('mode')||'all'; const STORY=params.get('story')||'ashen'; const NOEARLY=params.get('noearly')==='1';
+const inSt=o=>Object.keys(o).filter(k=>(o[k].story||'ashen')===STORY);
+function mkState(cls){ cls=cls||'warrior'; const S=G.newState({name:'T',cls,origin:'farm',skills:G.classes[cls].picks.slice(0,2),seed:777}); return S; }
+/* ---------- static validation ---------- */
+function validate(){
+  let errs=0; const E=s=>{ errs++; if(errs<80) log('  ✗ '+s); };
+  const ids=Object.keys(G.scenes); log('static scenes: '+ids.length);
+  const knownBiomes=new Set(G.biomes);
+  const S0=mkState('mage'); S0.gold=9999; S0.hp=99999; S0.maxHp=99999;
+  const atoms=(r)=>{ const out=[]; (r||'').split(/[|&]/).forEach(a=>{ a=a.replace(/^!/,''); out.push(a.split(':')); }); return out; };
+  const checkReq=(r,where)=>{ if(!r) return; atoms(r).forEach(([k,v,n])=>{
+      if((k==='skill'||k==='spell') && !G.skills[v]) E(where+' unknown skill '+v);
+      if(k==='item' && !G.items[v]) E(where+' unknown item '+v);
+      if(k==='ally' && !G.allies[v]) E(where+' unknown ally '+v);
+      if(k==='cls' && !G.classes[v]) E(where+' unknown cls '+v);
+      if(k==='origin' && !G.origins[v]) E(where+' unknown origin '+v);
+      if(k==='bond' && !G.allies[v]) E(where+' unknown bond ally '+v);
+    }); };
+  const fxRun=(fx,where)=>{ if(!fx) return; const T=JSON.parse(JSON.stringify(S0)); T.items=Object.assign({},S0.items); T.sv={}; T.story=/^(cg|mini cg)/.test(where)?'changi':(/^(gr|mini gr)/.test(where)?'greek':'ashen'); const R={text:'',tags:[]}; try{ G.applyFx(T,fx,R,{}); }catch(e){ E(where+' fx "'+fx+'": '+e.message); }
+      (fx.match(/>[^\s]+/g)||[]).forEach(t=>{ const id=t.slice(1); if(!G.scenes[id] && !id.startsWith('~') && id!=='battle') E(where+' jumps to missing scene '+id); }); };
+  const checkScene=(id,def,tag)=>{
+    const where=tag+id;
+    if(def.art){ const b=(def.art.split('|')[0]); if(!knownBiomes.has(b)) E(where+' bad biome '+b); }
+    const txt = typeof def.text==='function' ? (()=>{ try{ return def.text(S0);}catch(e){ E(where+' text fn: '+e.message); return ''; } })() : def.text;
+    if(/\{\?[^}]*\{\?/.test(txt||'')) E(where+' nested conditional');
+    let hasSafe=false;
+    (def.opts||[]).forEach((o,i)=>{ const w=where+' opt'+(i+1);
+      checkReq(o.r,w); if(o.c && !/^(STR|DEX|CON|INT|WIS|CHA) \d+ \w+$/.test(o.c)) E(w+' bad check '+o.c);
+      if(o.y){ fxRun(o.y[1],w+'.y'); } if(o.n){ fxRun(o.n[1],w+'.n'); }
+      if(G.isSafe(o)) hasSafe=true; if(o.act) hasSafe=true; });
+    if(!def.card && !hasSafe && !def.end) E(where+' has no safe option');
+    try{ const T=JSON.parse(JSON.stringify(S0)); T.items=Object.assign({},S0.items); T.cur={kind:'static',id}; G.resolveCur(T); }catch(e){ E(where+' resolve: '+e.message); }
+  };
+  ids.forEach(id=>checkScene(id,G.scenes[id],''));
+  // chapter beats
+  Object.keys(G.chapters).forEach(cid=>{ const ch=G.chapters[cid]; const T=mkState('rogue'); const bs=typeof ch.beats==='function'?ch.beats(T):ch.beats; let spine=0,enc=0,camp=0; bs.forEach(b=>{ const raw=b; if(b.includes('?')&&!/^[~#@]/.test(b)) b=b.slice(b.indexOf('?')+1); if(b[0]==='~'){ if(b==='~camp')camp++; else enc++; return;} if(b[0]==='@'||b[0]==='#'||b==='!gate') return; spine++; if(!G.scenes[b]) E('chapter '+cid+' beat missing scene '+b); });
+    log(`  chapter ${cid}: beats=${bs.length} spine=${spine} enc=${enc} camp=${camp}`); });
+  // ally talks
+  Object.keys(G.talks).forEach(a=>{ if(!G.allies[a]) E('talk for unknown ally '+a); G.talks[a].forEach((t,i)=>{ [t.k,t.j,t.p].forEach(x=>{ if(!x||x.length<2) E('talk '+a+i+' malformed'); }); if(t.p&&t.p[2]) fxRun(t.p[2],'talk '+a+i); }); });
+  // mini pools
+  Object.keys(G.mini).forEach(n=>{ G.mini[n].forEach((e,i)=>{ const w='mini '+n+'#'+i+' '+e[1]; if(e.length<5) E(w+' malformed'); const safe=e[4].some(a=>!a[1]&&!a[6]&&!a[7]&&!/die|hp-[lm]/.test((a[3]||''))); if(!safe) E(w+' no safe option');
+      e[4].forEach((a,k)=>{ checkReq(a[6],w+' opt'+(k+1)); if(a[1]&&!/^(STR|DEX|CON|INT|WIS|CHA) \d+ \w+$/.test(a[1])) E(w+' bad check '+a[1]); fxRun(a[3],w+'.y'+k); fxRun(a[5],w+'.n'+k); }); }); });
+  // foes
+  Object.keys(G.foes).forEach(f=>{ const F=G.foes[f]; if(!F.lv||!F.n||!F.intro) E('foe '+f+' incomplete'); if(F.win) fxRun(F.win,'foe '+f); });
+  // regions
+  Object.keys(G.regions).forEach(r=>{ const R=G.regions[r]; Object.keys(R.enc).forEach(n=>{ if(!G.arch[n]) E('region '+r+' unknown archetype '+n); }); (R.elites||[]).forEach(e=>{ if(!G.foes[e]) E('region '+r+' missing elite '+e); }); });
+  log('static validation errors: '+errs); return errs;
+}
+/* ---------- bot play ---------- */
+function bot(cls, seed, policy){
+  const S=G.newState({name:'Bot',cls,story:STORY,origin:(STORY==='ashen'?['farm','smith','inn','orphan','hunter']:inSt(G.origins))[seed%(STORY==='ashen'?5:inSt(G.origins).length)],skills:G.classes[cls].picks.slice(seed%3,seed%3+2).concat([]),seed,diff:params.get('diff')||'normal'});
+  let steps=0, lastScene='', stats={perks:0}; const log2=[];
+  while(steps++<4000){
+    if(S.dead || (S.cur&&S.cur.kind==='death')) return {S,dead:true,scene:lastScene,steps,towerAt:stats.towerAt};
+    let sc; try{ sc=G.resolveCur(S);}catch(e){ return {S,err:'resolve '+JSON.stringify(S.cur)+' '+e.message,steps}; }
+    lastScene=sc.id+'/'+sc.title; if(sc.end) return {S,ended:true,ending:sc.id,steps,towerAt:stats.towerAt};
+    const av=sc.opts.filter(o=>o.avail); if(!av.length) return {S,err:'no options '+sc.id,steps};
+    // choose
+    let best=-1,bi=0; const hpf=S.hp/S.maxHp;
+    av.forEach((o,i)=>{ let sc2=Math.random()*0.5; if(o.chk) sc2+= (policy==='careful'? o.pct*1.5 : o.pct*0.9); else sc2+=0.6; if(o.safe) sc2+= hpf<0.5?0.8:0.15; if(o.mp && S.mp<o.mp) sc2-=5; if(o.battle){ sc2+= 0.6; } if(/Flee|flee/.test(o.label)&&hpf>0.5) sc2-=1; if(/Defend/.test(o.label)&&hpf>0.6) sc2-=.6; if(hpf<0.4 && /Mend|Drink|use /.test(o.label)) sc2+=1.5; if(o.raw&&o.raw.r) sc2+=0.3; if(o.label==='Begin a new journey') sc2=-9; if(NOEARLY && o.raw && o.raw.y && /goto:/.test(o.raw.y[1])) sc2-=9; if(sc2>best){best=sc2;bi=i;} });
+    // use potions when low out of combat
+    if(hpf<0.45 && !S.battle){ ['greater_draught','healing_draught','bandages','ration'].some(id=>{ if(S.items[id]>0){ G.useItem(S,id); return true; } }); }
+    if(S.mp<S.maxMp*0.3 && !S.battle){ ['mana_tonic','greater_mana'].some(id=>{ if(S.items[id]>0){ G.useItem(S,id); return true; } }); }
+    try{ const r=G.choose(S,bi); if(r&&r.act==='new') return {S,ended:true,ending:'new',steps}; }catch(e){ return {S,err:'choose '+lastScene+' opt '+av[bi].label+' :: '+e.stack.split('\n').slice(0,3).join(' | '),steps}; }
+    // consumables as scrolls
+    Object.keys(S.items).forEach(id=>{ if(/^(scroll|manual)_/.test(id) && S.items[id]>0) G.useItem(S,id); });
+    if(S.chapter && S.chapter!==stats.lastCh){ stats.lastCh=S.chapter; if(S.chapter===(STORY==='ashen'?'tower':(STORY==='greek'?'gr9':'cg4'))) stats.towerAt=S.choices; }
+  }
+  return {S,err:'step cap '+lastScene,steps};
+}
+function sim(){
+  const classes=inSt(G.classes); const res={}; const ends={}; const errs=[]; let total=0;
+  const perChapDeath={}; const lvTower=[]; const deathScenes={}; const towerAts=[]; const tower={n:0,choices:[]}; const lvAt={};
+  for(let i=0;i<NSIM;i++){ for(const cls of classes){ total++; const r=bot(cls,1000+i*13+classes.indexOf(cls), i%2?'careful':'norm');
+      if(r.err){ errs.push(cls+': '+r.err); continue; }
+      const key=r.S.chapter||'?'; if(r.towerAt!=null){ towerAts.push(r.towerAt); } if(r.dead){ deathScenes[r.scene]=(deathScenes[r.scene]||0)+1; perChapDeath[key]=(perChapDeath[key]||0)+1; (lvAt[key]=lvAt[key]||[]).push(r.S.lvl); }
+      if(r.ended){ ends[r.ending]=(ends[r.ending]||0)+1; }
+      if(r.S.chi>=G.chapterOrder.indexOf('tower')+1 || r.ended){ tower.n++; } tower.choices.push(r.S.choices);
+      res[cls]=res[cls]||{n:0,dead:0,ended:0,lv:0,ch:0}; res[cls].n++; if(r.dead)res[cls].dead++; if(r.ended)res[cls].ended++; res[cls].lv+=r.S.lvl; res[cls].ch+=r.S.choices; } }
+  log('\nSIMULATION: '+total+' bot runs');
+  Object.keys(res).forEach(c=>{ const x=res[c]; log(`  ${c.padEnd(8)} runs=${x.n} died=${x.dead} finished=${x.ended} avgLvl=${(x.lv/x.n).toFixed(1)} avgChoices=${(x.ch/x.n).toFixed(0)}`); });
+  log('  deaths per chapter: '+JSON.stringify(perChapDeath));
+  log('  avg level at death per chapter: '+JSON.stringify(Object.fromEntries(Object.entries(lvAt).map(([k,v])=>[k,(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1)]))));
+  log('  choices when entering the tower: min='+Math.min(...towerAts)+' max='+Math.max(...towerAts)+' n='+towerAts.length);
+  log('  death scenes: '+JSON.stringify(deathScenes));
+  log('  avg final level (all runs): '+(Object.values(res).reduce((a,x)=>a+x.lv,0)/Object.values(res).reduce((a,x)=>a+x.n,0)).toFixed(1));
+  log('  endings: '+JSON.stringify(ends));
+  log('  reached the tower or finished: '+tower.n+' / '+total);
+  const mx=Math.max(...tower.choices), mn=Math.min(...tower.choices); log('  choices made range: '+mn+'..'+mx);
+  log('  ERRORS: '+errs.length); errs.slice(0,15).forEach(e=>log('    '+e));
+}
+try{ if(MODE!=='sim') validate(); if(MODE!=='static') sim(); }catch(e){ log('FATAL '+e.stack); }
+document.getElementById('out').textContent=out.join('\n');
+</script>

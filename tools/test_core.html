@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>core test</title>
+<body style="font:13px monospace;background:#111;color:#ddd;white-space:pre-wrap" id="out">
+<script src="../js/engine.js"></script>
+<script src="../js/data_core.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/regions.js"></script>
+<script src="../js/encounters.js"></script>
+<script src="../js/mini.js"></script>
+<script>
+const out=[]; const log=s=>out.push(s);
+try{
+  G.sc('t_start','meadow|🧒','Test scene',[{t:'Go',y:['ok','xp+s']}]);
+  G.chapter('test',{n:'Test',sub:'x',text:'t',art:'meadow|🧒',region:'greenmarch',ch:1,beats:['t_start']});
+  let errs=0;
+  const clsList=Object.keys(G.classes);
+  for(const region of Object.keys(G.regions)){
+    for(const cls of clsList){
+      const S=G.newState({name:'T',cls,origin:'farm',skills:[G.classes[cls].picks[0],G.classes[cls].picks[1]],seed:12345});
+      S.region=region; S.ch= ({thornwick:0,brindlecross:0,greenmarch:1,stonehelm:2,gloamfen:3,amber:4,saltwind:5,frostmere:6,hollowdeep:7,ashen:8,tower:8})[region]; S.allies=['aldric','mira'];
+      for(let i=0;i<60;i++){
+        S.wx=['clear','rain','storm','fog','snow','sandstorm','heat','ashfall','wind'][i%9]; S.tod=i%4;
+        S.cur = i%7===6 ? {kind:'gen',a:'camp',p:G.arch.camp.pick(S,G.regions[region])} : (i%11===0? {kind:'gen',a:'merchant',p:G.arch.merchant.pick(S,G.regions[region])}: null);
+        if(!S.cur){ G.nextBeat; const kind=null; S.queue=['~enc']; try{ G.nextBeat(S);}catch(e){ log('DIRECTOR '+region+' '+e.message); errs++; continue; } }
+        let sc; try{ sc=G.resolveCur(S);}catch(e){ log('RESOLVE '+region+' '+JSON.stringify(S.cur)+' '+e.stack.split('\n').slice(0,3).join('|')); errs++; continue; }
+        const av=sc.opts.filter(o=>o.avail);
+        if(av.length<1){ log('NO OPTS '+sc.title); errs++; }
+        if(!sc.opts.some(o=>o.safe)) { log('NO SAFE OPT '+region+' '+sc.title+' :: '+sc.opts.map(o=>o.label+'['+o.safe+']').join(' / ')); errs++; }
+        // art
+        const art=G.art(sc.art,S,sc.id); if(art.includes('<text x="480" y="190" fill="#ccc"')) { log('ART FAIL '+sc.art+' '+art.slice(-120)); errs++; }
+        // run every option on a clone
+        for(let k=0;k<av.length;k++){ const T=JSON.parse(JSON.stringify(S)); T.items=Object.assign({},T.items); try{ G.choose(T,k);}catch(e){ log('CHOOSE '+region+' '+sc.title+' opt'+k+' '+e.message); errs++; } }
+      }
+    }
+  }
+  log('regions tested; errors: '+errs);
+  // art for all biomes
+  for(const b of G.biomes){ for(let t=0;t<4;t++){ const S={tod:t,wx:['clear','rain','storm','fog','snow'][t]}; const a=G.art(b+'|🐺 🌲',S,'x'); if(a.includes('fill="#ccc"')) log('ART '+b+' '+t+' '+a.slice(-100)); } }
+  log('biomes ok: '+G.biomes.length);
+}catch(e){ log('FATAL '+e.stack); }
+document.getElementById('out').textContent=out.join('\n');
+</script>
