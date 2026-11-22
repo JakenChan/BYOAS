@@ -196,6 +196,25 @@ aside{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
 }
 @media (prefers-reduced-motion:reduce){.actor,.rainfx,.snowfx,.fogfx,.windfx,.flash,.scene .s{animation:none}}
 
+/* ===== bedtime stories: one quiet column, soft colours ===== */
+body.bed #app{grid-template-columns:minmax(0,1fr)}
+body.bed aside,body.bed #bPanel,body.bed #bOpts,body.bed .bars{display:none!important}
+body.bed main{border-right:0}
+body.bed #story{background:radial-gradient(ellipse at top,#10172e,#0a0e1c);padding:22px clamp(18px,8vw,120px) 12px}
+body.bed .scene.bedscene{font-size:clamp(19px,2.2vw,23px);line-height:1.95;color:#cdd5ee;max-width:46em;margin:0 auto}
+body.bed .scene.bedscene .s{animation:none}
+body.bed .scene.bedscene .speaking{background:#9fb4ff1a;box-shadow:0 0 0 4px #9fb4ff1a;color:#f4f6ff}
+body.bed .bp{margin:0 0 18px}
+body.bed .bp.dim{color:#8a93b4;font-style:italic;font-size:.9em}
+body.bed .bhead{font-variant:small-caps;letter-spacing:.14em;color:#e8d9a8;font-size:1.1em;margin:6px 0 16px;text-align:center}
+body.bed .asknote{margin-top:18px;padding-top:12px;border-top:1px solid #2b3558;color:#a9b4da}
+body.bed #opts{background:#0a0e1c;border-top:1px solid #222b4a}
+.bedctl{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+.bedctl .bb{padding:6px 14px;background:#121a34;color:#c9d2f0;border:1px solid #2b3764;border-radius:18px;font:14px system-ui;cursor:pointer}
+.bedctl .bb:hover{border-color:#6a7ec8}
+.dicebar{margin:8px 2px 4px;color:#b9c4ee;font:15px system-ui}
+body.dim #app{filter:brightness(.4) saturate(.6)}
+
 </style>
 </head>
 <body>
@@ -9728,6 +9747,669 @@ ALLY.sp_oko = [
 
 </script>
 <script>
+/* Soft night scenes for the bedtime story: low contrast, slow colours, a moon in almost every picture */
+(function(){
+const G = globalThis.G, K = G.artKit, W = K.W, H = K.H, f = K.f, glow = K.glow;
+const sky = (a, b) => `<defs><linearGradient id="bs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#bs)"/>`;
+const stars = (x, n) => Array.from({length:n}, () => `<circle cx="${f(x.R(0,W))}" cy="${f(x.R(0,H*0.65))}" r="${f(x.R(.5,1.7))}" fill="#fff" opacity="${f(x.R(.3,.9))}"/>`).join('');
+const moon = (cx, cy, r) => glow(cx, cy, r*4.5, '#fff6d0', .35) + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff3c4"/><circle cx="${cx-r*.3}" cy="${cy-r*.2}" r="${r*.18}" fill="#f0e2a8" opacity=".6"/><circle cx="${cx+r*.25}" cy="${cy+r*.25}" r="${r*.12}" fill="#f0e2a8" opacity=".5"/>`;
+const hill = (y, amp, col, seed, x) => { let d = `M0 ${H} L0 ${y}`; for (let i = 0; i <= 8; i++) d += ` Q${i*120-60} ${f(y - amp*(0.4+x.R(0,1)))} ${i*120} ${f(y + x.R(-8,8))}`; return `<path d="${d} L${W} ${H}Z" fill="${col}"/>`; };
+const water = (y, a, b) => `<defs><linearGradient id="bw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect y="${y}" width="${W}" height="${H-y}" fill="url(#bw)"/>`;
+const glints = (x, y0, n) => Array.from({length:n}, () => `<rect x="${f(x.R(0,W-60))}" y="${f(x.R(y0,H-6))}" width="${f(x.R(20,70))}" height="2" rx="1" fill="#fff6d0" opacity="${f(x.R(.15,.45))}"/>`).join('');
+const boat = (cx, cy) => `<path d="M${cx-60} ${cy} Q${cx} ${cy+34} ${cx+60} ${cy} L${cx+44} ${cy-8} L${cx-44} ${cy-8}Z" fill="#e9dfc8"/><rect x="${cx-2}" y="${cy-48}" width="4" height="40" fill="#cdbf9e"/><path d="M${cx+2} ${cy-46} L${cx+36} ${cy-18} L${cx+2} ${cy-18}Z" fill="#fff6d8" opacity=".92"/>${glow(cx, cy-14, 70, '#ffe9a8', .35)}`;
+const lamp = (cx, cy, c) => glow(cx, cy, 36, c || '#ffd88a', .5) + `<circle cx="${cx}" cy="${cy}" r="5" fill="#fff0c0"/>`;
+const tree = (cx, base, h, col) => `<path d="M${cx} ${base-h} L${cx-h*.28} ${base} L${cx+h*.28} ${base}Z" fill="${col}"/><path d="M${cx} ${base-h*.78} L${cx-h*.34} ${base-h*.22} L${cx+h*.34} ${base-h*.22}Z" fill="${col}"/>`;
+
+G.addBiome('moonwindow', x => sky('#0d1630','#1d2a4a') + stars(x,60) + moon(660,120,46) +
+  `<rect x="150" y="30" width="660" height="300" rx="10" fill="none" stroke="#3b4a72" stroke-width="12"/><rect x="474" y="30" width="12" height="300" fill="#3b4a72"/><rect x="150" y="170" width="660" height="10" fill="#3b4a72"/>` +
+  `<rect y="300" width="${W}" height="60" fill="#241b36"/><path d="M0 330 Q480 290 ${W} 330 L${W} ${H} L0 ${H}Z" fill="#3a2d58"/><circle cx="250" cy="305" r="16" fill="#e9dfc8" opacity=".9"/>`, true);
+G.addBiome('moonriver', x => sky('#0b1430','#1c2d55') + stars(x,70) + moon(700,100,38) + hill(230,40,'#16213f','a',x) + water(236,'#223a6a','#122042') + glints(x,246,12) + boat(430,290), false);
+G.addBiome('meadowlamps', x => sky('#0e1a38','#24365e') + stars(x,50) + moon(180,90,34) + hill(215,50,'#1d3a46','a',x) + hill(262,40,'#16303a','b',x) +
+  Array.from({length:11}, (_,i) => lamp(60+i*85+x.R(-12,12), 230+x.R(0,90), i%3===0?'#ffd88a':(i%3===1?'#ffc6a0':'#d6f0ff'))).join('') + `<rect y="320" width="${W}" height="40" fill="#10242c"/>`, false);
+G.addBiome('owlwood', x => sky('#0a1228','#16264a') + stars(x,40) + moon(480,70,30) +
+  Array.from({length:14}, (_,i) => tree(30+i*70+x.R(-10,10), 330, x.R(150,250), i%2?'#112238':'#0d1b2e')).join('') + `<rect y="320" width="${W}" height="40" fill="#0a1626"/>` +
+  `<circle cx="640" cy="205" r="22" fill="#2a3a5a"/><circle cx="630" cy="200" r="7" fill="#ffe9a8"/><circle cx="652" cy="200" r="7" fill="#ffe9a8"/>`, false);
+G.addBiome('reedbank', x => sky('#10183a','#2a3a62') + stars(x,50) + moon(740,90,34) + water(210,'#2b4572','#142446') + glints(x,222,10) +
+  Array.from({length:26}, (_,i) => { const rx = 20+i*37+x.R(-8,8), rh = x.R(90,170); return `<path d="M${rx} 340 Q${rx+x.R(-14,14)} ${340-rh*.6} ${rx+x.R(-20,20)} ${340-rh}" stroke="#3d5a52" stroke-width="3" fill="none"/><ellipse cx="${rx+x.R(-20,20)}" cy="${340-rh}" rx="4" ry="11" fill="#5a4a3a"/>`; }).join(''), false);
+G.addBiome('belltower', x => sky('#10183a','#26365e') + stars(x,60) + moon(210,110,36) + hill(280,30,'#16213f','a',x) +
+  `<rect x="560" y="70" width="90" height="250" fill="#2a3150"/><path d="M552 74 L605 20 L658 74Z" fill="#3a4268"/><rect x="580" y="96" width="50" height="62" rx="25" fill="#10162c"/><path d="M590 156 Q605 90 620 156Z" fill="#e0c070"/>` + lamp(605,130,'#ffe9a8') + `<rect y="318" width="${W}" height="42" fill="#0f1a30"/>`, false);
+G.addBiome('singingstones', x => sky('#14183c','#2c3a66') + stars(x,70) + moon(500,80,30) + hill(250,36,'#1d2c4a','a',x) +
+  Array.from({length:9}, (_,i) => { const sx = 90+i*95, sh = x.R(60,130); return `<rect x="${sx}" y="${320-sh}" width="${x.R(28,48)}" height="${sh}" rx="14" fill="#3a4a72"/>${lamp(sx+16, 320-sh+14, i%2?'#bfe0ff':'#ffd8f0')}`; }).join('') + `<rect y="320" width="${W}" height="40" fill="#121c36"/>`, false);
+G.addBiome('quietsea', x => sky('#0b1230','#26386a') + stars(x,80) + moon(480,90,42) + water(200,'#2a4478','#0e1a3c') + glints(x,210,18) + `<path d="M0 200 L${W} 200" stroke="#9fc0ff" stroke-width="1" opacity=".3"/>` + boat(300,300), false);
+G.addBiome('cloudharbor', x => sky('#1c2448','#4a5a8c') + stars(x,40) + moon(780,80,32) +
+  Array.from({length:9}, (_,i) => `<ellipse cx="${60+i*110+x.R(-20,20)}" cy="${240+x.R(-10,60)}" rx="${x.R(70,120)}" ry="${x.R(22,38)}" fill="#c8d2ee" opacity="${f(x.R(.35,.7))}"/>`).join('') +
+  `<rect x="380" y="150" width="14" height="110" fill="#8a7a5a"/><path d="M360 150 L387 100 L414 150Z" fill="#c8b890"/>` + lamp(387,120,'#ffe9a8') + boat(560,250), false);
+G.addBiome('lighthouse', x => sky('#0a1230','#1f3260') + stars(x,70) + moon(160,80,30) + water(250,'#223c70','#0e1a3c') + glints(x,260,12) +
+  `<path d="M460 120 L500 120 L520 300 L440 300Z" fill="#d8d2c8"/><rect x="452" y="170" width="56" height="18" fill="#7a8ac0"/><rect x="448" y="230" width="64" height="18" fill="#7a8ac0"/><rect x="450" y="96" width="60" height="26" fill="#3a4268"/>` +
+  `<path d="M480 108 L${W} 60 L${W} 150Z" fill="#fff3c4" opacity=".16"/>` + lamp(480,108,'#fff0b0') + `<path d="M0 300 Q480 270 ${W} 300 L${W} ${H} L0 ${H}Z" fill="#141f3a"/>`, false);
+G.addBiome('moongarden', x => sky('#17204a','#3a4a7c') + stars(x,70) + moon(480,100,56) + hill(250,40,'#25406a','a',x) +
+  Array.from({length:16}, (_,i) => { const fx = 30+i*58+x.R(-10,10), fy = 280+x.R(0,60); return `<path d="M${fx} ${fy} L${fx} ${fy-24}" stroke="#4a7a6a" stroke-width="3"/><circle cx="${fx}" cy="${fy-28}" r="7" fill="${i%3?'#cfe0ff':'#ffe0f0'}" opacity=".9"/>`; }).join('') + `<rect y="330" width="${W}" height="30" fill="#162a48"/>`, false);
+G.addBiome('starfield', x => `<rect width="${W}" height="${H}" fill="#070c1e"/>` + glow(480,180,420,'#2a3a80',.3) + stars(x,140) + moon(480,150,40) + boat(480,300), false);
+})();
+
+</script>
+<script>
+/* BEDTIME PLAYER: a long, slow, voiced story with a handful of gentle forks.
+   No stats, no skills, no danger. The story keeps itself going: each chunk is read aloud, then the next one begins.
+   At a fork the listener can choose with a key or a tap; if nothing happens for a minute the dice choose. */
+(function(){
+const G = globalThis.G;
+const B = G.bed = {};
+const NODES = {}, DEF = {};
+const ASK_WAIT = 60;                 /* seconds before the dice decide */
+const FAST = Math.max(1, +(new URLSearchParams(location.search).get('bedfast') || 1));   /* test hook: ?bedfast=40 runs the timers 40 times faster */
+
+/* register a bedtime story: meta for the library + a map of nodes */
+G.bedStory = (id, def) => {
+  DEF[id] = def; NODES[id] = def.nodes;
+  G.story(id, { title:def.title, icon:def.icon, art:def.art, tag:def.tag, desc:def.desc, intro:def.intro, bedtime:true, defName:'Dreamer' });
+};
+G.bedNodes = NODES;
+
+let UI = null, st = null, tok = 0, paused = false, curUnits = [], curIdx = 0, curDone = null, timers = [], clockT = null, wake = null, askT = null;
+const $ = s => document.querySelector(s);
+const clearTimers = () => { timers.forEach(clearTimeout); timers = []; if (askT){ clearInterval(askT); askT = null; } };
+const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
+const key = id => 'aq_save_' + id, endKey = id => 'aq_bed_ends_' + id;
+const seenEnds = id => { try { return JSON.parse(UI.LS.get(endKey(id)) || '[]'); } catch(e){ return []; } };
+const nEnds = id => Object.keys(NODES[id]).filter(k => NODES[id][k].end).length;
+
+/* ---------- narration: voice if it is on, otherwise a quiet reading-speed timer ---------- */
+function build(paras, startNo){
+  const units = []; let no = startNo || 0; let html = '';
+  paras.forEach(p => {
+    const ss = UI.sentences(String(p)).map(s => s.trim()).filter(Boolean);
+    html += '<p class="bp">' + ss.map(s => { const id = 'bs' + (no++); units.push({ text:s, id }); units.push({ pause: 550 }); return `<span class="s" id="${id}">${UI.esc(s)}</span> `; }).join('') + '</p>';
+    units.push({ pause: 2200 });
+  });
+  return { units, html };
+}
+function bindEls(units){
+  units.forEach((u, i) => { if (u.id){ u.el = document.getElementById(u.id); u.cb = () => { curIdx = i; }; } });
+}
+function highlight(u){
+  document.querySelectorAll('.speaking').forEach(e => e.classList.remove('speaking'));
+  if (u && u.el){ u.el.classList.add('speaking'); try{ u.el.scrollIntoView({ block:'center', behavior:'smooth' }); }catch(e){} }
+}
+function timerPlay(units, from, my, done){
+  let i = from;
+  const step = () => {
+    if (my !== tok) return;
+    if (paused){ later(step, 400); return; }
+    if (i >= units.length){ done && done(); return; }
+    const u = units[i]; curIdx = i; i++;
+    if (u.pause){ later(step, u.pause / FAST); return; }
+    highlight(u);
+    const words = String(u.text).split(/\s+/).length;
+    later(step, Math.round(words / 2.1 * 1000 / Math.max(.5, UI.SP.rate) / FAST));
+  };
+  step();
+}
+function play(units, from, done){
+  const my = ++tok; curUnits = units; curIdx = from || 0; curDone = done;
+  UI.stopSpeech();
+  const slice = units.slice(from || 0);
+  if (UI.SP.on && window.speechSynthesis){
+    UI.runUnits(slice.map((u, k) => Object.assign({}, u, { cb: u.id ? () => { curIdx = (from||0) + k; } : null })), () => { if (my === tok) done && done(); },
+      failedAt => { if (my === tok) timerPlay(units, (from||0) + failedAt, my, done); });
+  } else timerPlay(units, from || 0, my, done);
+}
+
+/* ---------- screens ---------- */
+function frame(node, F){
+  UI.setArt(node.art || DEF[st.id].art, st.id + '|' + st.node, node.title || DEF[st.id].title, '');
+}
+function chrome(extra){
+  return `<div class="bedctl">${extra||''}<button class="bb" id="bbPause">⏸ Pause</button><button class="bb" id="bbDim">🌙 Dim</button><button class="bb" id="bbMute">${UI.SP.on?'🔊 Voice on':'🔇 Voice off'}</button></div>` +
+    `<div class="hint"><span class="kbhint">Space pause or resume · <b>M</b> voice on/off · <b>D</b> dim the screen · <b>+</b>/<b>−</b> speed · <b>Esc</b> menu</span><span class="tchint">Tap Pause to stop for a moment, Dim to darken the screen.</span></div>`;
+}
+function wireChrome(){
+  const p = $('#bbPause'); if (p) p.onclick = togglePause;
+  const d = $('#bbDim'); if (d) d.onclick = toggleDim;
+  const m = $('#bbMute'); if (m) m.onclick = () => { UI.SP.on = !UI.SP.on; UI.LS.set('aq_voice_on', UI.SP.on ? '1' : '0'); if (!UI.SP.on) UI.stopSpeech(); UI.updateVoiceBtns(); B.voiceChanged(); m.textContent = UI.SP.on ? '🔊 Voice on' : '🔇 Voice off'; };
+}
+function togglePause(){
+  paused = !paused;
+  const p = $('#bbPause'); if (p) p.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  if (window.speechSynthesis && UI.SP.on){ try{ paused ? speechSynthesis.pause() : speechSynthesis.resume(); }catch(e){} }
+  UI.toast(paused ? 'Paused' : 'Resuming');
+}
+function toggleDim(){ document.body.classList.toggle('dim'); }
+
+function save(){ if (!st || st.over) return; UI.LS.set(key(st.id), JSON.stringify({ n:st.node, F:st.F })); }
+
+function go(id){
+  clearTimers(); paused = false; const N = NODES[st.id][id]; if (!N) { console.error('missing bed node', id); return; }
+  st.node = id; if (N.set) Object.assign(st.F, N.set);
+  if (N.ask) return showAsk(N);
+  showText(N);
+}
+function paras(N){ const t = typeof N.text === 'function' ? N.text(st.F) : N.text; return (t || []).filter(Boolean); }
+
+function showText(N){
+  save(); frame(N);
+  const b = build(paras(N)); const s = $('#story');
+  s.innerHTML = `<div class="scene bedscene">${N.head ? `<p class="bhead">${UI.esc(N.head)}</p>` : ''}${b.html}</div>`; s.scrollTop = 0;
+  bindEls(b.units);
+  $('#opts').innerHTML = N.end ? '' : chrome(); if (!N.end) wireChrome();
+  UI.setCUR({ opts:[] });
+  const after = N.end ? () => finish(N) : () => later(() => go(typeof N.next === 'function' ? N.next(st.F) : N.next), 1800 / FAST);
+  later(() => play(b.units, 0, after), 900 / FAST);
+}
+
+function showAsk(N){
+  save(); frame(N);
+  const opts = N.opts;
+  const b = build(paras(N)); const s = $('#story');
+  s.innerHTML = `<div class="scene bedscene">${b.html}</div>`; s.scrollTop = 0;
+  const nm = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+  const keyWords = opts.map((o, i) => nm[i].toLowerCase());
+  const intro = [ 'If you would like to choose, press ' + keyWords.slice(0, -1).join(', ') + ' or ' + keyWords[keyWords.length - 1] + ', or tap. If you wait, the dice will choose for you.' ];
+  const ob = build([intro[0]].concat(opts.map((o, i) => `${nm[i]}. ${o.t}`)), 5000);
+  s.querySelector('.scene').insertAdjacentHTML('beforeend', `<div class="asknote">${ob.html}</div>`);
+  const units = b.units.concat(ob.units); bindEls(units);
+  const btns = opts.map((o, i) => `<button class="opt" data-i="${i}"><span class="key">${i + 1}</span><span class="lbl">${UI.esc(o.t)}</span></button>`).join('');
+  $('#opts').innerHTML = btns + `<div class="dicebar" id="dicebar">&nbsp;</div>` + chrome(); wireChrome();
+  $('#opts').querySelectorAll('button.opt').forEach(x => x.onclick = () => choose(+x.dataset.i, false));
+  UI.setCUR({ opts: opts.map((o, i) => ({ avail:true, fn: () => choose(i, false) })) });
+  st.ask = N;
+  play(units, 0, () => countdown(N));
+}
+B.reread = () => { if (st && st.ask && curUnits.length) play(curUnits, 0, () => countdown(st.ask)); };
+
+function countdown(N){
+  let left = Math.ceil(ASK_WAIT / (FAST > 1 ? 10 : 1)); const bar = $('#dicebar'); const tick = () => { if (bar) bar.innerHTML = `🎲 Take your time. If you do not choose, the dice will decide in <b>${left}</b> seconds.`; };
+  tick(); if (askT) clearInterval(askT);
+  askT = setInterval(() => { if (paused) return; left--; tick(); if (left <= 0){ clearInterval(askT); askT = null; rollDice(N); } }, 1000);
+}
+function rollDice(N){
+  const n = N.opts.length, face = 1 + Math.floor(Math.random() * 6), idx = Math.min(n - 1, Math.floor((face - 1) / (6 / n)));
+  const bar = $('#dicebar'); if (bar) bar.innerHTML = `🎲 The dice tumble and land on <b>${face}</b>.`;
+  const word = ['one', 'two', 'three', 'four', 'five', 'six'][face - 1];
+  const line = { text: `No choice yet? Then let the dice decide. The dice tumble, and they land on ${word}. So we will go this way. ${N.opts[idx].t}`, id:null };
+  play([line, { pause: 1200 }], 0, () => choose(idx, true));
+}
+function choose(i, byDice){
+  if (!st || !st.ask) return; const N = st.ask; const o = N.opts[i]; if (!o) return;
+  st.ask = null; clearTimers(); UI.stopSpeech(); tok++;
+  st.F[N.flag] = o.v; st.F.last = o.v; (st.trail = st.trail || []).push(o.v);
+  if (o.set) Object.assign(st.F, o.set);
+  UI.LS.set('aq_bed_log_' + st.id, JSON.stringify(st.trail));
+  go(typeof o.to === 'function' ? o.to(st.F) : o.to);
+}
+
+function finish(N){
+  st.over = true; UI.LS.del(key(st.id));
+  const seen = seenEnds(st.id); if (!seen.includes(st.node)){ seen.push(st.node); UI.LS.set(endKey(st.id), JSON.stringify(seen)); }
+  const total = nEnds(st.id);
+  const s = $('#story'); s.insertAdjacentHTML('beforeend', `<div class="scene bedscene"><p class="bhead">${UI.esc(N.end)}</p><p class="bp dim">You have now found ${seen.length} of ${total} different endings.</p></div>`);
+  $('#opts').innerHTML = `<button class="opt" data-i="0"><span class="key">1</span><span class="lbl">Hear the story again, and choose differently</span></button><button class="opt" data-i="1"><span class="key">2</span><span class="lbl">Back to the story library</span></button>`;
+  const again = () => B.start(st.id, false), lib = () => UI.toTitle();
+  const els = $('#opts').querySelectorAll('button.opt'); els[0].onclick = again; els[1].onclick = lib;
+  UI.setCUR({ opts:[ { avail:true, fn:again }, { avail:true, fn:lib } ] });
+  document.querySelectorAll('.speaking').forEach(e => e.classList.remove('speaking'));
+  try{ s.scrollTo({ top: s.scrollHeight, behavior:'smooth' }); }catch(e){}
+  releaseWake();
+}
+
+/* ---------- life cycle ---------- */
+function getWake(){ try{ if (navigator.wakeLock && !wake) navigator.wakeLock.request('screen').then(w => { wake = w; w.addEventListener('release', () => { wake = null; }); }).catch(()=>{}); }catch(e){} }
+function releaseWake(){ try{ if (wake) wake.release(); }catch(e){} wake = null; }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && st && !st.over) getWake(); });
+
+function clock(){
+  if (clockT) clearInterval(clockT); const t0 = Date.now();
+  const upd = () => { const h = $('#hdrchips'); if (h && st) h.innerHTML = `<span class="chip">🌙 Listening <b>${Math.floor((Date.now() - t0) / 60000)}</b> min</span>`; };
+  upd(); clockT = setInterval(upd, 20000);
+}
+B.start = (id, resume) => {
+  UI = window.AQ_UI; if (!UI) return; clearTimers(); tok++; UI.stopSpeech();
+  const def = DEF[id]; UI.clear(); UI.setMode('bed'); document.body.classList.add('bed'); document.body.classList.remove('dim');
+  UI.SP.mult = def.rate || 0.85; UI.SP.pitch = def.pitch || 0.9; UI.setBrand(def.title); UI.setHeader();
+  st = { id, node: def.start, F: {}, trail: [] };
+  if (resume){ try { const j = JSON.parse(UI.LS.get(key(id)) || 'null'); if (j && NODES[id][j.n]){ st.node = j.n; st.F = j.F || {}; } } catch(e){} }
+  else UI.LS.del(key(id));
+  const side = $('#rbody'); if (side) side.innerHTML = '';
+  clock(); getWake(); go(st.node);
+};
+B.stop = () => { clearTimers(); tok++; if (clockT){ clearInterval(clockT); clockT = null; } UI = UI || window.AQ_UI; if (UI){ UI.SP.mult = 1; UI.SP.pitch = 0.95; } document.body.classList.remove('bed', 'dim'); st = null; releaseWake(); };
+B.skip = () => { if (!st) return; if (st.ask){ return; } paused = false; tok++; UI.stopSpeech(); const N = NODES[st.id][st.node]; if (N && !N.end) go(typeof N.next === 'function' ? N.next(st.F) : N.next); };
+B.voiceChanged = () => {
+  if (!st || st.over || !curUnits.length) return;
+  const from = Math.max(0, curIdx); const done = curDone; play(curUnits, from, done);
+};
+B.onKey = e => {
+  if (!st) return false;
+  const k = (e.key || '').toLowerCase();
+  if (/^(Digit|Numpad)[1-9]$/.test(e.code)){ e.preventDefault(); const n = +e.code.slice(-1); if (st.ask){ choose(n - 1, false); return true; } return false; }
+  if (e.code === 'Numpad0' || k === 'r'){ e.preventDefault(); B.reread(); return true; }
+  if (k === ' ' || e.code === 'NumpadDecimal' || (k === 'enter' && !st.over)){ e.preventDefault(); if (!st.over) togglePause(); return true; }
+  if (k === 'm'){ UI.SP.on = !UI.SP.on; UI.LS.set('aq_voice_on', UI.SP.on ? '1' : '0'); if (!UI.SP.on) UI.stopSpeech(); UI.updateVoiceBtns(); B.voiceChanged(); const m = $('#bbMute'); if (m) m.textContent = UI.SP.on ? '🔊 Voice on' : '🔇 Voice off'; return true; }
+  if (k === 'd'){ toggleDim(); return true; }
+  if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd'){ UI.SP.rate = Math.min(1.6, UI.SP.rate + .05); UI.LS.set('aq_rate', UI.SP.rate); UI.toast('Voice speed ' + UI.SP.rate.toFixed(2)); return true; }
+  if (e.key === '-' || e.code === 'NumpadSubtract'){ UI.SP.rate = Math.max(.5, UI.SP.rate - .05); UI.LS.set('aq_rate', UI.SP.rate); UI.toast('Voice speed ' + UI.SP.rate.toFixed(2)); return true; }
+  return false;
+};
+B.def = id => DEF[id];
+B.state = () => st;
+B.go = id => go(id);
+})();
+
+</script>
+<script>
+/* THE MOON-BOAT — a bedtime story. Part 1: the beginning, the first fork (where the river goes) and the second fork (who rides along). */
+(function(){
+const G = globalThis.G;
+const by = (F, k, m) => m[F[k]] || '';
+
+G.bedStory('moonboat', {
+  title:'The Moon-Boat', icon:'🌙', art:'moonriver|🌙', start:'intro', rate:0.85, pitch:0.9,
+  tag:'A bedtime story · about an hour · five gentle choices · fifteen different endings · no danger at all',
+  desc:'A slow, quiet story to fall asleep to. A little boat made of moonlight floats up to your window and carries you down the river of night. Five times the river forks, and every way leads to a different ending. You can choose where to go, or simply wait, and the dice will choose for you. Nothing here is scary, nothing is lost, and nobody has to be clever. Press Begin, close your eyes, and listen.',
+  intro:'THE MOON-BOAT\nA bedtime story, told slowly.\nThis story takes about an hour. It is made to be listened to with your eyes closed, in bed, with the screen dimmed. There are no skills to choose and nothing to win. About every ten minutes the river will fork, and you may press a number key or tap to choose a way. If you wait for a minute, the dice will choose for you, and the story will carry on. There is no wrong way to go, and every way ends in sleep.',
+  nodes: {
+
+/* ------------------------------------------------------------------ INTRO */
+intro: { title:'The Moon-Boat', art:'moonwindow|🌙', head:'The Moon-Boat', next:'ask1', text:[
+`Welcome. This is a story to listen to, and not a story to work at. There is nothing to win, and nothing to be afraid of, and nothing at all that you have to do. If you like, you can close your eyes now. Let your hands rest wherever they are comfortable. Let your shoulders sink a little, as though they were made of warm sand. I will do the telling, and all you have to do is listen.`,
+`From time to time, the story will come to a fork, and I will ask you which way you would like to go. You can press a number, or tap, or you can simply wait. If you wait for a minute, the dice will choose for you, and the story will carry on, just as gently as before. There are no wrong choices here. Every road in this story is a good road, and every one of them ends in sleep.`,
+`So. The day is over now. The last of its noise has drifted away, like the sound of a door closing softly at the far end of a long corridor. The house is settling around you. Somewhere, a pipe ticks as it cools. Somewhere, a clock goes on counting, slowly and patiently, as clocks do. You are lying in your bed, and the blanket is exactly as heavy as you like it, and the pillow has found exactly the right shape for your head.`,
+`Breathe in, slowly, and let the breath fill you from the bottom, like water filling a jar. And breathe out, slowly, and let it all go. Once more. In, and out. Already, the bed feels a little softer than it did a moment ago.`,
+`The curtains are open just a little, and through the gap you can see the window, and in the window you can see the moon. It is a big, calm, round moon tonight, the colour of fresh cream. It does not hurry. It has never once hurried in all its life. It simply rises, and glows, and watches over everyone who is lying quietly in their beds, and tonight it is watching over you.`,
+`The moonlight falls through the glass and lies across the floor in a long, pale stripe. It is so bright and so soft that it looks almost like a path, a silver path, running from the window to the foot of your bed. You find yourself wondering where such a path might lead. You do not have to wonder very long.`,
+`Outside, very quietly, there is a sound. It is a small sound, a lapping, trickling sound, like water moving gently against wood. Lap, lap, lap. It comes closer, and stops, just under your window. And when you turn your head on the pillow, you see something resting on the sill, rocking very slightly, as if on a tiny wave.`,
+`It is a boat. It is a small, round-bellied boat, no bigger than a rocking chair, and it looks as if it has been folded from a single sheet of moonlit paper. Its sides are pearly white, and they glimmer softly. It has one little sail, as thin and pale as a page, and a cushion in the bottom that looks like the softest cushion in the world. Along its side, in curling silver letters, are written two words. The Moon-Boat.`,
+`You are not startled. Nothing in this story will ever startle you. You simply sit up, slowly, and the blanket slides round your shoulders like a friendly cat. You put one foot on the cool floor, and then the other. The boat waits for you. It rocks, just a little, as if to say, there is no hurry.`,
+`You climb onto the sill, and you step into the boat. It does not wobble, not even a little. It takes your weight as gently as a hand takes a feather. You settle down on the cushion, and pull the blanket over your knees, and the boat gives a soft, contented creak, like an old armchair when someone sits in it.`,
+`And now the window seems to grow wider, and wider, until it is no longer a window at all, but a great open doorway of night. The boat slips through it without a sound. You feel no wind. You feel no bump. You are simply outside, and floating, and the whole sleeping world is spread out beneath you like a quilt.`,
+`There is your street, with its little yellow lamps. There are the roofs of the neighbours' houses, grey and silver in the moonlight, and every one of them is fast asleep. A cat sits on a wall, washing one paw, in no hurry at all. A single window glows in the baker's shop, where somebody is already making tomorrow's bread, and you can almost smell it, warm and sweet, drifting up through the night.`,
+`The boat rises a little higher, and then, very slowly, it begins to settle, down and down, like a leaf falling on a windless day. Below you, the silver path from your bedroom floor has stretched itself out across the fields. It has widened. It has deepened. It is shining, and it is moving. It is not a path at all. It is a river.`,
+`The boat touches the water with a sound like a sigh. Lap. And then the river takes hold of it, as gently as a mother takes the hand of a sleepy child, and begins to carry you along. You do not need to steer. You do not need to row. The boat knows the way, and the river knows the way, and all that is left for you to do is to lean back, and let yourself be carried.`,
+`The water is wide and slow and shallow, and it glitters with a thousand tiny moons. The air smells of clover, and warm earth, and cool, clean water. On either bank, the meadows lie quiet and grey-green, and in the long grass the crickets are singing, a small, steady, silvery song, the same note over and over, like a lullaby that has forgotten all its words and kept only the tune.`,
+`A family of ducks is sleeping on the bank, every one of them with its head tucked under its wing, a row of soft, round, feathery pebbles. One of them opens a sleepy eye as you drift by, looks at you, looks at the boat, and closes the eye again, perfectly satisfied that everything is just as it should be.`,
+`Willow trees lean over the water, trailing their long green fingers through the current. As the boat glides beneath them, their leaves brush your hair, so lightly that you can hardly feel them, and they seem to whisper. Hush. Hush. Hush. You breathe out, and the hush goes right through you, from your head all the way down to your toes.`,
+`Above you, the stars have come out, far more of them than you ever see from your bedroom window. They are scattered across the sky like sugar spilled on a dark blue cloth. You could try to count them, but there is no need. They will be there tomorrow night, and the night after, and all the nights after that. Let them keep count for you.`,
+`The river grows wider. A thin, silvery mist begins to rise from the water, and it curls around the boat in slow, friendly ribbons. The moon follows you through the mist, just above the treetops, round and calm and kind. Everything is quiet. Everything is slow. Everything is exactly as it should be.`,
+`And then, ahead of you, the river begins to part. It does not split suddenly, or in a hurry. It simply widens, and widens, and divides itself, gently, into three channels, each one gleaming in a different light. The boat slows. It turns, in one long, lazy circle, as a dog turns before it lies down, and then it waits, rocking softly, in the place where the three waters meet. It is waiting for you to choose.`
+]},
+
+/* ------------------------------------------------------------------ FORK 1 */
+ask1: { ask:true, flag:'a', title:'Where the Rivers Part', art:'moonriver|🌙', text:[
+`Three channels lie before you. To the left, the water glows a warm, honey gold, and you can see a distant meadow, scattered with tiny lights, like a field of fallen stars. Straight ahead, the water is dark and deep and calm, and it flows beneath a great wood of tall, quiet trees, where something soft is calling, hoo, hoo, in the dark. And to the right, the water is pale and silvery, and it runs between rustling reeds that whisper, and almost sing, in the night breeze.`,
+`Which way would you like the boat to go?`
+], opts:[
+ { t:`Left, toward the warm golden lights of the Meadow of Lanterns.`, v:'lantern', to:'s1_lantern' },
+ { t:`Straight ahead, into the deep, quiet shadows of the Owl Wood.`, v:'feather', to:'s1_feather' },
+ { t:`Right, toward the soft whispering of the Singing Reeds.`, v:'flute', to:'s1_flute' }
+]},
+
+/* ------------------------------------------------------------------ BRANCH 1A: the Meadow of Lanterns */
+s1_lantern: { title:'The Meadow of Lanterns', art:'meadowlamps|🏮', next:'b1', text:[
+`The boat turns to the left, as slowly as a flower turning toward the sun, and slides into the golden channel. The water here is warm. You can feel the warmth rising from it, the way you feel the warmth rising from a bath, and it wraps around the boat and around your hands and your feet, and every muscle in you gives a little sigh and lets go.`,
+`Ahead, the meadow opens out. It is wide and gentle and gently sloping, and the grass is dotted, in every direction, with small round lights. Some are amber, and some are rose, and some are a soft, milky blue. At first you think they must be fireflies. But they do not move. They stand quite still on slender green stems, and glow, and each one is a flower, and each flower is a tiny lantern.`,
+`They are called lantern-flowers, and they bloom only at night, and only in this one meadow. All day long they close up tight and sleep, and all night they glow, so that anyone who is lost or tired or far from home can find a little light to walk by. They hum, very faintly, as they glow. You can hear it if you listen. Mmmm. It is the sound of a thousand small, contented things, all humming together in the dark.`,
+`The boat glides to the edge of the meadow, and stops where the river laps against the grass. Moths drift past, pale and soft as scraps of cloth, and they too are glowing, just a little, in the light of the flowers. One of them settles on the edge of the boat, folds its wings, and stays, and you can feel its tiny weight, hardly more than the weight of a thought.`,
+`Near the boat, one lantern-flower leans down toward you on its long, bending stem. It is the colour of warm honey. You hold out your hands, and the flower bows into them, as gently as a sleepy head bowing onto a shoulder, and the stem slips loose, and the flower is yours. It sits in your palms, glowing, no heavier than a feather. It is warm, as if someone had been holding it just for you.`,
+`This lantern-flower will keep its light for as long as you are calm. When you are worried, it will dim a little. When you are happy, it will glow brighter. And whenever you hold it close and breathe slowly, it will warm your hands, and your arms, and your chest, and the warm will spread all through you like honey spreading through hot milk. You hold it against your heart, and breathe in, and breathe out, and it glows a deep, steady gold.`,
+`The meadow hums on. The moths drift. The grass sways, all in one direction, like a great sleeping animal breathing out. You stay a little longer than you meant to, because it is so warm, and so quiet, and so very, very comfortable. And then, when you are ready, the river stirs beneath the boat, and the boat slides gently backwards, away from the grass, and turns once more toward the open water.`,
+`The lantern-flowers watch you go. One by one, as you drift away, they dim, and close, and bow their heads, and sleep.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 1B: the Owl Wood */
+s1_feather: { title:'The Owl Wood', art:'owlwood|🦉', next:'b1', text:[
+`The boat goes straight ahead, into the shadows, as softly as a thought slipping into a dream. The trees close in on either side, tall and dark and old, with trunks as wide as houses, and branches that meet high above the water and make a long, whispering roof. Moonlight finds its way through in thin, silver threads, and where the threads touch the river, they make little pools of light, and the boat drifts from one pool to the next, like a stepping stone.`,
+`It is very quiet in the Owl Wood. It is not an empty quiet, or a lonely quiet. It is the deep, full quiet of a place where everything is listening. The trees listen. The water listens. Even the moss on the old stones seems to listen, with its small, green, velvet ears. And in the stillness, every little sound is clear and soft and perfect. A drip of water. A rustle of leaves. The slow creak of a branch, stretching in its sleep.`,
+`And then, from somewhere above you, a voice. It is low and slow and kind. Hoo, it says. Hoo, hoo. And down from the branches, on wings so quiet that they make no sound at all, glides a great grey owl. It lands on the prow of the boat, and settles, and fluffs out its feathers, until it looks like a small, round, feathery cushion with two enormous, golden, thoughtful eyes.`,
+`Good evening, says the owl, in a voice like an old book being gently opened. I am the keeper of the listening. Every night I sit in this wood, and I listen to everything, so that nobody else has to. The wind, and the water, and the worries of all the little creatures, I listen to every one of them, and I keep them safe until morning. And do you know, it is the easiest thing in the world to do?`,
+`You shake your head, slowly, because you do not quite trust yourself to speak. The owl blinks. The secret of listening, it says, is to be as still as a stone in a stream. You do not have to catch the sounds. You do not have to hold on to them. You just let them flow past you, and through you, and away. Try it. Listen to the water. Listen to the trees. And let every other thing go.`,
+`So you try. You listen to the water, lapping, lapping. You listen to the trees, creaking, whispering. You listen to your own breath, going in, and going out, as slow as the tide. And as you listen, you find that all the other things in your head, all the busy, buzzing, restless things, have grown quiet, one by one, like children who have been told a long story.`,
+`The owl nods, very slowly, with approval. It lifts one great grey wing, and, with its beak, it takes a single soft feather from beneath it, the softest feather you have ever seen, as pale and light as smoke. It lays the feather in your hand. This is for you, it says. It is a feather of listening. When your head is full of noise, brush it across your forehead, and the noise will settle, like dust in the moonlight.`,
+`You hold the feather. It tickles your palm, very slightly, and you smile. The owl bows its round head, spreads its wings without a sound, and rises into the dark, and is gone. Hoo, it calls, once, from far away, and that is the last you hear of it. The boat turns, patient and slow, and carries you out from beneath the trees, toward the open water.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 1C: the Singing Reeds */
+s1_flute: { title:'The Singing Reeds', art:'reedbank|🎶', next:'b1', text:[
+`The boat bends to the right, as easily as a ribbon in the wind, and glides into the silver channel. The water here is pale and clear and perfectly smooth, like a sheet of glass laid over the stars, and the boat slides across it without so much as a ripple. On both sides, the reeds rise up, tall and slender and silvery, taller than you, taller than the boat, swaying gently, all together, like a crowd of tall, sleepy dancers.`,
+`And they are singing. It is not a song with words. It is a low, breathy, hollow sound, like someone blowing very softly across the top of a bottle. Whoo, whoo, whooo. As the breeze passes through the reeds, each one makes its own note, one high, one low, one in between, and together they make a long, slow, floating chord that rises and falls, and rises and falls, like the breathing of the night itself.`,
+`You trail your fingers in the water, and the reeds seem to notice. They sway a little closer. Their song grows softer, and slower, and sweeter, until it is hardly louder than a whisper. You can feel it in your chest, a low, gentle hum, like the purr of a very large, very sleepy cat. You lean back against the side of the boat, and let the song wash over you, and your eyes grow heavy, and then heavier.`,
+`Deep among the reeds, there is a small, quiet clearing, where the water is as still as a mirror. A family of otters is floating there on their backs, holding paws, all in a row, so that they will not drift apart in their sleep. Their whiskers twitch. One of them is smiling. They look as comfortable as anyone has ever looked, and the song of the reeds drifts over them like a blanket.`,
+`The boat slows, and stops, beside the tallest reed of all. It bends over you, very slowly, until its feathery head is near your hands. And there, tied to its stem with a bit of green grass, you see a small pipe, no longer than your hand, carved from a single piece of hollow reed. It has six little holes along its side, and it is pale gold, and as smooth as a pebble from the bed of a river.`,
+`You untie it, carefully, and hold it in your hands. You lift it to your lips, and you blow, very gently, with the softest breath you have. And out comes a note, a single, round, mellow note, like the sound of a sleepy owl, or a far-off bell, or a lullaby that you once knew. The reeds sway toward it. The otters sigh. The note floats away over the water, and keeps floating, and does not seem to end.`,
+`This is a sleep-flute. Whoever plays it will find that the notes come by themselves, and that every one of them is slow, and soft, and low. Whoever hears it will grow drowsy, and slow, and soft, and low. It has never woken anyone. It has never frightened anyone. It has only ever helped the world to rest. You tuck it into the folds of your blanket, where it lies warm and safe, and you feel its quiet there, beside you.`,
+`The reeds sway back upright, and their song softens into the dark. The boat turns, with the lightest of motions, and carries you away from the clearing, and the sleeping otters, and out toward the wider water. Behind you, the singing goes on, low and slow, for as long as there is a night to sing in.`
+]},
+
+/* ------------------------------------------------------------------ BRIDGE 1 */
+b1: { title:'The Slow Water', art:'moonriver|🌙', next:'ask2', text: F => [
+`The three channels come together again, as quietly as they parted, and the river becomes one wide, slow, shining road. The boat drifts out into the middle of it, and settles, and the current takes it up once more. Lap, lap, lap, says the water against the wood. You have heard that sound before, perhaps, long ago, or perhaps only in dreams, and it is just as comforting now as it ever was.`,
+by(F,'a',{
+ lantern:`In your hands, the lantern-flower glows a soft, steady gold. It lights up the inside of the boat, and your knees, and the folds of the blanket, and a small circle of the dark water all around you. Every time you breathe out, it seems to glow a little brighter, as though it were breathing with you. You hold it close, and feel its warmth spreading through your fingers, and your hands, and your arms.`,
+ feather:`In your hand, the feather of listening lies as light as a breath. You run it, once, across your forehead, as the owl told you, and something in your head grows quiet, like a room when the last guest has gone home. It is such a small, soft feeling, and such a good one. You rest the feather on your knee, and it stirs a little in the breeze, like something sleeping.`,
+ flute:`Tucked into the folds of your blanket, the little sleep-flute rests, warm from your hands. Every so often, without your touching it, it gives out a tiny, breathy note, as the wind passes over its holes, and each time it does, you feel your shoulders drop a little lower. It is as if the night itself were humming you a tune, over and over, so softly that you almost think you are making it up.`}),
+`The moon has climbed a little higher now. It sits above the river like a great pale lamp, and its light lies across the water in a long, trembling path, and the boat follows it, as if it knew all along that this was the way. On either bank, the land is rolling and quiet, and the hills lie against the sky like sleeping animals, with their backs rising and falling in slow, steady breaths.`,
+`You pass a farm, a small, low farm with a red barn and a black pond, and every light in it is out. A horse stands in the field with its head hanging low, one hind leg resting, dozing on its feet. A dog lies across the doorstep, with its nose on its paws. A single sheep lifts its head as you float by, and watches you, and then lowers it again, and goes back to dreaming about whatever sheep dream about, which is probably grass.`,
+`The river bends, in a long, slow curve, and the sound of it changes. The water grows deeper, and quieter, and more still. You can no longer hear the lapping against the boat. You can hear only your own breath, going in and out, and, very far away, the faint, sleepy ticking of something that might be a clock, or might be a cricket, or might be the beating of your own calm heart. Tick. Tick. Tick.`,
+`An owl calls, far off. A frog answers, once, from the reeds, and then thinks better of it, and falls silent. The stars shift slightly overhead, as stars do, so slowly that nobody ever sees them move. A long, cool breeze stirs the surface of the water, and passes across your face like a hand, and is gone.`,
+`You are beginning to feel a little tired now. It is not a heavy, aching tiredness. It is a soft, warm, pleasant tiredness, like the feeling of sinking into a hot bath, or a pile of fresh leaves. It starts in your toes, and moves slowly up through your feet, and your ankles, and your knees. Let it come. There is no hurry. Let it climb as slowly as it likes.`,
+`Ahead, you see a small wooden jetty, reaching out from the left bank, with a single lantern hanging from a post at its end. The light is yellow and warm and low. And on the jetty, in the glow of the lantern, you can see three small shapes, sitting side by side, quite patiently, as if they had been waiting there for a very long time, and did not mind in the least. The boat drifts toward them, slowing, slowing, until it comes to rest against the wood with the very softest of bumps.`
+]},
+
+/* ------------------------------------------------------------------ FORK 2 */
+ask2: { ask:true, flag:'b', title:'The Little Jetty', art:'moonriver|🏮', text:[
+`Three travellers are waiting on the jetty, and each of them is looking at you hopefully. The first is a fox, with a soft russet coat, a bushy tail curled around its feet, and a sleepy, friendly smile. The second is a very small mouse, wearing a tiny nightcap, and carrying a tiny candle in a tiny holder. The third is a tall grey heron, standing perfectly still on one long leg, with its head tilted, as if it were listening to something far away.`,
+`The boat has room for just one more passenger. Whoever you choose will ride with you for the rest of the night, and will tell you a story as you go. Who would you like to have beside you?`
+], opts:[
+ { t:`The fox, with the sleepy smile.`, v:'fox', to:'s2_fox' },
+ { t:`The tiny mouse in the nightcap.`, v:'mouse', to:'s2_mouse' },
+ { t:`The tall, quiet heron.`, v:'heron', to:'s2_heron' }
+]},
+
+/* ------------------------------------------------------------------ BRANCH 2A: the fox */
+s2_fox: { title:'The Fox and the Small Stars', art:'moonriver|🦊', next:'b2', text:[
+`The fox steps lightly down from the jetty, and into the boat, and the boat hardly dips at all. It curls up at the other end of the cushion, with its tail wrapped round its nose, and gives a long, delicious yawn that shows all its small white teeth. Thank you, it says, in a voice as soft as a woollen sock. It is very kind of you. I have been walking all night, and my feet are quite tired. Would you like to hear a story?`,
+`You nod, and the fox smiles, and settles its chin on its paws, and begins. A long time ago, it says, when the world was new, the stars were not small like they are now. They were great, enormous, blazing things, each one as big as the sun, and every one of them shone all night long, so brightly that nobody could sleep. The birds sang at midnight. The flowers never closed. The children lay awake in their beds, with the light streaming in through the curtains, and tossed, and turned, and yawned, and could not rest at all.`,
+`Now, there was a fox in those days, who lived at the edge of a wood, and she was the sleepiest fox who ever lived. She wanted nothing in the whole world but a long, dark, quiet night, and a warm place to curl up in. But the great stars blazed, and blazed, and she could not close her eyes. So one evening, she set out. She walked, and she walked, over the hills and under the trees, until she came to the very top of the highest mountain in the land, where the sky comes right down to touch the earth.`,
+`And there, she called up, as politely as she could. Excuse me, she said. Excuse me, great stars. You are very beautiful, and very bright, and we are all so grateful for your light. But do you think you might possibly be a little smaller, and a little softer, just at night, so that the rest of us can sleep?`,
+`The stars were astonished. They had never been asked such a thing before. They muttered among themselves, and they flickered, and they thought it over, for a very long time. They were proud of being big. But the fox had asked so nicely, and she looked so tired. At last, the biggest star of all said, very slowly, I suppose we might try.`,
+`And so, one by one, the stars began to shrink. They drew in their light, and folded it up small, like children curling up in a bed, until each of them was no bigger than a spark, no larger than a grain of silver sand. And the sky grew dark, and deep, and velvety, and full of tiny, twinkling lights, as soft and small as the lights in a sleeping village. And all over the world, the birds tucked their heads under their wings, and the flowers closed their petals, and the children turned over, and sighed, and fell asleep.`,
+`The little fox was so happy that she curled up right there on the mountain-top, in the long, cool grass, under all the small stars. And she slept, and slept, and slept. And that, says the fox, with another huge yawn, is why the stars are small, and why we can sleep at night. And every night since then, they have been twinkling, very softly, as if to say thank you.`,
+`The fox's voice has grown slow, and low, and fuzzy at the edges. Its eyes are closing. By the time the story reaches its end, it is hardly more than a murmur, and then it is only the sound of breathing. The fox is asleep, with its tail over its nose, and its paws twitching just a little, as it runs through some quiet, golden dream. You smile, and pull the blanket a little higher, and the boat slips out into the river once more.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 2B: the mouse */
+s2_mouse: { title:'The Mouse and the Smallest Bed', art:'moonriver|🕯️', next:'b2', text:[
+`The mouse scurries down the jetty, and hops, with a little squeak, into the boat, and settles in the very middle of the cushion, with its tiny candle held up in front of it like a lamp. Its nightcap is a faded red, with a bobble on the end, and its whiskers are as fine as spun silk. Good evening, it says, in the smallest, politest voice you have ever heard. I hope I am not in the way. I shall be no trouble at all. May I tell you a story?`,
+`You nod, very slowly, so as not to disturb the candle, and the mouse clears its throat, and begins. This, it says, is the story of how I found the smallest and most comfortable bed in the whole wide world. When I was very young, you see, I could not sleep. I had a bed, of course. It was a good bed, made of straw and old string. But it was lumpy, and it was draughty, and every night I tossed and turned, and thought, there must be a better bed somewhere.`,
+`So I set out, with my candle and my nightcap, to find it. First, I tried a teacup. It was round and smooth and nicely shaped, but it was far too hard, and it rolled. Then I tried a boot. It was warm, and it smelled of leather, but it was so big that I felt lost in it, like a pea in a bucket. Then I tried a glove, and a thimble, and a sock, and a hat, and every one of them was nearly right, and not quite.`,
+`At last, as the sun was going down, I came to a walnut tree at the edge of a field. And there, in the grass beneath it, lay half a walnut shell, quite empty, and just the right size. I climbed in, and it fitted me like a hug. It was round, and smooth, and curved exactly as I curve. And it rocked, very gently, from side to side, whenever I moved. I had never been so comfortable.`,
+`But I needed a blanket. And just then, a breeze came by, and carried a little tuft of thistledown across the field, as light and soft and white as a cloud. It landed right on top of me, and settled, and tucked itself in around my edges, and kept me warm. And I needed a pillow, and a single rose petal, fallen from a bush nearby, drifted down and lay beneath my head, cool, and silky, and sweet-smelling.`,
+`And so I lay there, in my walnut shell, under my thistledown, on my rose petal, with the moon coming up over the field, and the crickets starting their song. I was the smallest mouse, in the smallest bed, in the biggest, quietest night in the world. And I thought, well, this is it. This is what I was looking for. And I closed my eyes, and I slept for twelve hours without waking once.`,
+`Since then, says the mouse, I have never been without a good bed. And do you know the secret? It is that the best bed is never the biggest, or the grandest. It is only the one that fits you. And you, my dear, I think, have a very good bed indeed. The mouse looks up at you, over the flame of the little candle, and smiles, and blinks, once, slowly.`,
+`And then the mouse yawns, a tiny, whiskery yawn, and sets its candle down on the cushion, where it burns, steady and small. It curls up round the candle's base, like a comma, with its nose tucked into its tail, and its nightcap pulled down over its eyes. In a moment, it is breathing slowly, in and out, in and out, as small and as peaceful as a sleeping seed. You pull the blanket gently up, so that the corner covers it, too, and the boat drifts onward.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 2C: the heron */
+s2_heron: { title:'The Heron and the Patient River', art:'moonriver|🪶', next:'b2', text:[
+`The heron steps down from the jetty, one long leg at a time, as carefully as someone crossing a stream on stones, and folds itself into the boat, a little at a time, like a deckchair being closed. It settles at the front, where the prow rises, and stands there, tall and grey and calm, looking out over the water. It says nothing for a long time. And you find that you do not mind. The quiet that comes from the heron is a good quiet, wide and deep.`,
+`At last, without turning its head, it begins to speak, in a voice so low and slow that it seems to come from the river itself. I have stood by this water, it says, for more years than I can count. And I will tell you what I have learned. I have learned that nothing worth having is ever hurried. The river does not hurry. And yet the river always arrives.`,
+`Long ago, when the land was young, there was nothing here but flat, hard, dry stone. No valley. No hills. No gentle bends. And then one day, a single drop of rain fell on the stone, and trickled away. And the next day, another. And the day after, another. Each drop was very small. Each drop did very little. But they kept on coming, one after another, year after year, and every one of them took a tiny grain of stone along with it.`,
+`The rain did not rush. It did not push, or shout, or fight the stone. It simply kept on, softly, patiently, always the same, and in the end, the stone gave way. A little channel appeared. Then a little stream. Then, after a thousand thousand years, a river, wide and deep and shining, winding its way through a green valley, with the willows leaning over it, and the herons standing in the shallows, and the moon laying its silver path on the water.`,
+`The heron lifts one foot, slowly, and sets it down in a slightly different place. That is the secret of the river, it says. It does not have to be strong. It only has to be steady. It does not have to be fast. It only has to keep going, gently, all night, all day, and the whole world will make room for it. And so, whenever you feel that you must hurry, or push, or worry about getting there, think of the river, and let yourself flow.`,
+`You think of the river, and you let yourself flow. You feel your breath slowing, and your thoughts slowing, and your heartbeat slowing, until everything inside you moves at the pace of the water, and every part of you is calm and wide and smooth. The heron nods, though it has not looked at you once, and it seems pleased. You are a quick learner, it says. Most people take a hundred years.`,
+`The heron falls silent again. After a while, it tucks its long neck down into its shoulders, and closes its eyes, and stands there, on one leg, perfectly balanced, perfectly still, asleep on its feet like a grey stone in the stream. You do not make a sound. You only watch the water slide past, and listen to the faint, far-off, glittering sound of the river going on, and on, and on.`
+]},
+
+}});
+})();
+
+</script>
+<script>
+/* THE MOON-BOAT — part 2: the long water, the third fork (a far-off sound) and the fourth fork (what to set afloat). */
+(function(){
+const G = globalThis.G, N = G.bedNodes.moonboat;
+const by = (F, k, m) => m[F[k]] || '';
+
+Object.assign(N, {
+
+/* ------------------------------------------------------------------ BRIDGE 2 */
+b2: { title:'The Misty Lake', art:'moonriver|🌫️', next:'ask3', text: F => [
+`The jetty slips away behind you, and the little lantern at its end grows small, and smaller, until it is only a yellow spark, and then it is gone. The river takes up the boat again. It is wider now, and darker, and calmer, and it moves so slowly that you can scarcely feel it moving at all. The only way to tell is to watch the banks, which drift past you, a little at a time, like pictures in a very old book.`,
+by(F,'b',{
+ fox:`The fox sleeps at the far end of the cushion, with its tail curled over its nose. Every so often one of its ears twitches, and its paws make small, running movements in the air, as though it were chasing something soft and golden through a dream. Its breathing is slow and warm, and you can feel it, faintly, through the floor of the boat, like the purring of a very quiet engine.`,
+ mouse:`The mouse sleeps in the middle of the cushion, curled around the foot of its little candle, which burns on, steady and small, and does not flicker. Its nightcap has slipped down over one eye. Its breathing is so tiny, and so light, that it hardly stirs the fur on its chest, and it makes a sound no bigger than the turning of a page.`,
+ heron:`The heron sleeps at the prow, standing on one leg, with its head tucked into its shoulders. It is quite motionless, like a statue of a bird, and the moonlight lies along its grey back as silver as frost. When the boat sways, it sways with it, gently, and does not wake. Even in its sleep, it seems to be listening to the river.`}),
+`The banks fall away, one on each side, and the river opens out into a wide, round lake, as still as a bowl of milk. A mist lies over it, low and white and soft, no higher than your knees, so that the boat seems to be sailing through a cloud. Everything beyond the mist has softened, and blurred, and grown quiet. The moon is a pale, round smudge of light. The stars are faint and far away.`,
+`Here and there, small islands rise out of the whiteness, each with a single tree on it, and each tree is hung with a few pale, glowing lanterns, like a Christmas tree in a dream. You glide past one, and then another, and then a third, and they are so still and so silent that you almost feel you should whisper, even though there is nobody to wake.`,
+`The water makes a small sound as it slides along the side of the boat. A sleepy, pleasant, rippling sound. Shhh. Shhh. Shhh. It is the sound that your own breath makes when you let it all out at the end of a long day. Shhh. You find that you are breathing in time with it, in, and out, in, and out, and each breath is a little slower than the last.`,
+`You notice that your eyelids have grown heavy. They are as heavy as two little curtains, and every time you blink, they take a little longer to open again. You do not mind. You let them close, just for a moment, and then you open them, and the mist is still there, and the lake is still there, and the boat is still drifting, as softly as ever. There is nothing to wake up for. There is nothing to be anxious about.`,
+`And as you drift, you begin to hear something. Not one thing, but three, far off, each one very quiet, each one coming from a different direction across the lake. They are so faint that at first you think you must be imagining them. But the boat has slowed, and turned a little, and seems to be listening too. It is as if it were saying, which of these would you like to follow?`
+]},
+
+/* ------------------------------------------------------------------ FORK 3 */
+ask3: { ask:true, flag:'c', title:'Three Faraway Sounds', art:'moonriver|🔔', text:[
+`The first sound comes from the left, through the mist: a bell. It is a deep, round, golden bell, struck very slowly, once, and then, a long while later, once again. Each stroke hangs in the air, and floats, and fades, like a soap bubble drifting away.`,
+`The second sound comes from straight ahead: a low, gentle humming, as if a great many voices were singing the same long note together, very softly, in a place with stone walls. It rises, and holds, and falls, and rises again.`,
+`The third sound comes from the right, and from very far away: a deep, slow, rolling sound, like a song sung by something enormous and tender, that has all the time in the world. It sounds like the sea, and it sounds like a voice, and it sounds like both at once.`,
+`Which sound would you like the boat to follow?`
+], opts:[
+ { t:`The golden bell, on the left.`, v:'bell', to:'s3_bell' },
+ { t:`The soft humming of voices, straight ahead.`, v:'stones', to:'s3_stones' },
+ { t:`The deep, slow song of the sea, on the right.`, v:'sea', to:'s3_sea' }
+]},
+
+/* ------------------------------------------------------------------ BRANCH 3A: the bell */
+s3_bell: { title:'The Island of the Last Bell', art:'belltower|🔔', next:'b3', text:[
+`The boat turns to the left, and follows the bell. It is a long, slow journey, and you do not mind it at all, for each time the bell rings, the sound seems to travel across the water and settle inside you, deep in your chest, where it hums for a while, warm and round, before it fades. By the time the third stroke has come, you feel as though you have been rocked in a very large pair of arms.`,
+`The mist thins, and a small island appears, round and green and gentle, like a loaf of bread. At the top of it stands a tower, a short, stout, old stone tower, with a pointed roof, and a single window under the eaves, glowing a soft yellow. In the window hangs a great bronze bell, as big as a barrel, green with age. And beside the bell, on a stool, sits a very old tortoise, in a pair of round spectacles, with a rope in its hand.`,
+`The boat bumps softly against the little stone landing. The tortoise looks down, slowly, over the top of its spectacles. Ah, it says. A visitor. How lovely. Come up, come up, there is no hurry. There is never any hurry here. You step out onto the landing, and climb the steps, which are worn smooth and shallow by many years of slow feet, and they take you up to the window, where the tortoise is waiting.`,
+`I am the keeper of the Last Bell, says the tortoise. Every night, when the world is ready to rest, I ring it once. Just once. And everyone who hears it knows that the day is over, and that whatever was not finished can wait until morning. It is a very old custom. I have been doing it for four hundred years, and I have not missed a night. Would you like to ring it?`,
+`You nod. The tortoise hands you the rope. It is thick, and soft, and warm from its hand, and it is as long as a river. You take it in both hands, and you pull, slowly, slowly, and the great bell swings, and swings, and then, with a deep, golden boom that you feel in your feet and your knees and your ribs, it rings.`,
+`The sound rolls out over the water, wide and slow, and as it goes, you feel something go out of you with it. It is the last of the day's small cares, the tight little knots of worry you did not even know you were holding, all of them loosening, and drifting away on the long golden note, out over the lake and the mist and the sleeping islands, until you cannot feel them any more. How good that feels. How light. How quiet.`,
+`The bell hums on, long after the stroke has gone. The tortoise smiles. That is the Last Bell, it says. Nothing else is needed. Goodnight, dear traveller. You thank it, though you hardly have the breath to speak, and the tortoise waves one wrinkled foot, and you go back down the steps and into the boat, and you sit, and the boat turns, and the bell sounds once more behind you, very soft, and very far, like a heartbeat in the night.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 3B: the stones */
+s3_stones: { title:'The Hill of Singing Stones', art:'singingstones|🎵', next:'b3', text:[
+`The boat goes straight ahead, toward the humming, and the sound grows slowly clearer, a deep, round, flowing hum, like a hundred voices singing a single long note in a great cool hall. It does not stop. It does not hurry. It simply goes on, and on, breathing in, and out, and in, and out, and the breath of it is as slow as the breath of someone fast asleep.`,
+`The mist lifts, and a low green hill rises from the water, with a gentle, curved top, like the back of a sleeping cow. And on the hill, standing in a wide ring, are stones. They are tall and smooth and grey, and each one is as round-shouldered as an old man in a long cloak, and each one has a small, soft, silvery light, glowing, deep inside it. And each one is singing.`,
+`Every stone sings one note, and one note only. The tall ones sing low, and the short ones sing high, and the round ones sing in the middle, and together they make a great, slow, slowly changing chord, like a sunrise made of sound. When one stone stops to breathe, another takes up its note, so that the song itself never stops, but flows round the ring, from stone to stone, as gently as water going round a pool.`,
+`The boat slides up to the shore, and you step out onto the grass, which is cool and soft and dry. You walk, slowly, toward the ring. As you pass between the stones, you can feel their song in your skin, in your hands, in the bones of your face. It is a good feeling, like having your back rubbed. It makes you want to close your eyes. So, at the centre of the ring, where the grass is thickest and softest, you lie down, and look up.`,
+`And above you, the sky is full of stars, so many that the dark between them seems hardly to be there. The stones sing, all around you, low and slow. And you begin to understand that these stones have been here since before there were people, and that they have heard every lullaby that was ever sung, by every mother, and every father, and every grandmother, in every language, in every house, in every century. The stones remember them all.`,
+`They are singing them now, all together, so quietly and so softly that they are all one song. You can almost hear them: a cradle-song from the hills, a hush-a-bye from the sea, a tune that someone hummed to you, a long time ago, when you were very, very small, and did not know that you would remember it. The stones sing it back to you, and it fills you up, like warm milk, and you feel, from head to foot, safe, and loved, and sleepy.`,
+`You lie there for a long, long while, and the stones sing, and the stars turn, and the grass is soft. When you are ready, you rise, slowly, as slowly as a sleeper rolling over in bed, and you walk back to the boat. The nearest stone gives one last, low, warm note, as if to say goodnight, and you step in, and the boat glides away, with the humming following you, quieter and quieter, across the water.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 3C: the sea */
+s3_sea: { title:'The Quiet Sea', art:'quietsea|🐋', next:'b3', text:[
+`The boat turns to the right, toward the far, deep song, and the lake begins to open, wider and wider, until there is no shore at all. The mist rolls away. And you find that you are floating on the sea, a great, dark, quiet sea, as flat and smooth as black glass, with the whole sky lying in it, upside down. Every star is there twice, once above you, and once below you, so that the boat seems to hang in the very middle of the universe, with nothing above and nothing beneath.`,
+`The song is louder now. It rolls across the water, long and deep and slow, a note that begins very low, and rises, and rises, and then falls again, softly, like a sigh. You feel it in the boat. You feel it in the water. You feel it in the middle of your chest, a kind of gentle, rocking tremble, like the purr of the biggest cat in the world.`,
+`And then, quite close, the water stirs. A great, dark, smooth shape rises beside the boat, quite slowly, without a ripple, and it is the largest living thing you have ever seen. It is a whale. It is as long as a street, and as grey as the sea at dusk, and its skin is dotted with small pale barnacles, like a sky dotted with stars. It turns one enormous, dark, kindly eye toward you, and the eye is as deep and gentle as a well.`,
+`The whale does not speak, for whales do not need words. It only sings, softly, so softly that the water barely moves, and you find that you understand it perfectly. It is saying, welcome. It is saying, there is room for everyone in the sea. It is saying, the night is long, and kind, and wide, and nothing in it is anything to be afraid of. Rest. Rest. Rest.`,
+`The whale swims beside the boat, so slowly, and so smoothly, that the boat hardly rocks. Its great back rises and falls, like a hill, and when it breathes out, a soft, silver mist rises from it, and drifts across the water, and falls on your face like the gentlest rain. It smells of salt, and of faraway places, and of old, calm, sleeping things. You breathe it in.`,
+`The whale sings again, a long, low, rolling note, and the sea sings it back, and the sky seems to sing it too, so that you are sitting inside a song, with the notes going all around you like warm water. Your arms grow heavy. Your head rolls gently back against the side of the boat. You feel as if you were being rocked in a cradle that is as big as the world.`,
+`After a long, long time, the whale sinks, as slowly as it rose, without a sound. The sea closes over its great back, in one long, smooth, silver ring, and the ring widens, and widens, and fades. But the song goes on, far down in the deep, and you can feel it through the bottom of the boat for a long time afterwards, a slow, soft, drowsy hum, like a heartbeat, saying goodnight, and goodnight, and goodnight.`
+]},
+
+/* ------------------------------------------------------------------ BRIDGE 3 */
+b3: { title:'Heavy Eyelids', art:'moonriver|🌙', next:'ask4', text: F => [
+by(F,'c',{
+ bell:`The sound of the Last Bell is still in the air, though it has been a long time since it rang. It has become part of the night. You can hear it in the quiet between your breaths, a soft, golden humming, like a bee on a summer afternoon. Every time you breathe out, a little more of the day slips away.`,
+ stones:`The song of the stones is still with you, though the hill is far behind. It has settled into the lowest, quietest part of your mind, and goes on there by itself, slow, and round, and warm, like a fire that has burned down to embers. You do not have to listen to it. It listens to you.`,
+ sea:`The whale's song is still with you, though the sea has closed over it. It lingers in the boat, in the water, in the soles of your feet. It has become part of the way you breathe. Long, and slow, and deep. In, and out. Like waves arriving on a quiet shore, and going back, and arriving again.`}),
+`The boat drifts on. The river has found its way again, and it is narrower now, and quieter, and it moves so slowly that the stars seem to be moving faster than the water. The banks are lined with tall grass, and long, bending branches, and in the grass, here and there, are small, round, pale flowers that glow very faintly, and close, one by one, as you pass them. Goodnight, they seem to say. Goodnight.`,
+by(F,'b',{
+ fox:`The fox murmurs in its sleep, and turns over, and tucks its nose a little deeper into its tail. A soft little snore comes out of it, no louder than a kettle thinking about boiling. You smile, and reach across, very gently, and tuck the end of your blanket over its paws.`,
+ mouse:`The mouse turns over in its sleep, and the nightcap slips off altogether, and it does not notice. A tiny snore comes out, the size of a pin, and fades. You lift the nightcap, very carefully, between a finger and a thumb, and lay it back over the small round head, and the mouse sighs, and sleeps on.`,
+ heron:`The heron shifts its weight from one leg to the other, without waking, and settles again. Its feathers ruffle in the breeze, and lie flat. It looks, for a moment, almost like a part of the boat itself, a tall grey mast, with a sleeping head, and the moon behind it. You let your gaze rest on it, and the moon, and the water, and everything goes soft at the edges.`}),
+`You yawn, a long, slow, comfortable yawn, the kind that begins in your stomach and goes all the way up, and stretches your whole face. And then you yawn again. It is such a pleasant thing, a yawn. It means that you are nearly there. It means that the day has done with you, and the night is taking over, and all you have to do is let it.`,
+`The moon is lower now, and larger, and more golden. It hangs just above the treetops, and its light lies on the water like a long, warm path. You feel as though you could step out of the boat onto the path and walk all the way to the moon, and it would hold you up, and you would not be a bit afraid. But the boat is so comfortable, and the cushion is so soft, that you stay where you are, and let the path come to you.`,
+`Everything that you were carrying with you tonight, everything that you brought from the day, is beginning to feel a little heavy. Not a bad heavy. Only the kind of heavy that comes from carrying something for a long time, and being ready, now, to put it down. The boat seems to feel it too. It sits a little lower in the water. It is as if it were saying, there is no need to hold on to anything any more.`,
+`And then, as you drift round a long, slow bend, you see that the water ahead is quite still, and clear, and shallow, and dotted all over with leaves. They are floating leaves, hundreds of them, small, and round, and silvery green, drifting on the surface like a field of little lily-pads, each one waiting, quite patiently, for something to be set upon it.`
+]},
+
+/* ------------------------------------------------------------------ FORK 4 */
+ask4: { ask:true, flag:'d', title:'The Floating Leaves', art:'moonriver|🍃', text:[
+`The boat slows among the leaves, and stops, as if it knew that this was a place for stopping. A soft voice, which might be the water, or the night, or your own thoughts, tells you what the leaves are for. They are for setting things afloat. You can place something on a leaf, and send it away down the river, and the river will carry it off, into the dark, where it will be turned into something gentle.`,
+`You have room for one thing, tonight. It might be a worry, one that has been following you around, heavy and small, and which you are quite ready to be rid of. It might be a wish, something that you hope for, and would like the river to carry to wherever wishes are kept. Or it might be a happy memory, a good moment from your day, or from long ago, which you would like to keep safe, and warm, and shining, as you fall asleep.`,
+`What would you like to set afloat?`
+], opts:[
+ { t:`A worry, to let the river take it away.`, v:'worry', to:'s4_worry' },
+ { t:`A wish, to send out into the night.`, v:'wish', to:'s4_wish' },
+ { t:`A happy memory, to keep it shining.`, v:'memory', to:'s4_memory' }
+]},
+
+});
+})();
+
+</script>
+<script>
+/* THE MOON-BOAT — part 3: setting something afloat, the last stretch of river, the final fork and nine endings. */
+(function(){
+const G = globalThis.G, N = G.bedNodes.moonboat;
+const by = (F, k, m) => m[F[k]] || '';
+
+Object.assign(N, {
+
+/* ------------------------------------------------------------------ BRANCH 4A: a worry */
+s4_worry: { title:'The Worry Leaf', art:'moonriver|🍃', next:'b4', text:[
+`You lean over the side of the boat, and you choose a leaf. It is a small one, round and cool and silvery, and when you touch it, it does not sink, but rocks, very slightly, on the dark water. You hold it in your palm. You think of the worry that has been sitting at the back of your mind tonight, the one that comes round and round, like a moth at a lamp. You do not have to look at it for long. You only have to know it is there.`,
+`Gently, you breathe out, and as you do, the worry comes out with your breath, and settles on the leaf, as small and as light as a grain of dust. It does not look so very big, now that it is outside you. It looks, in fact, a little silly, like a small grey pebble that you had mistaken for a mountain. You almost smile at it.`,
+`You lower the leaf onto the water. It floats there, a moment, quite still, and then the river takes it. It begins to drift, slowly, slowly, out among the other leaves, and past the lily-pads, and away down the dark, shining water. You watch it go. It gets smaller. And smaller. And as it goes, you feel a little lighter, as if you had put down a bag that you had been carrying so long you had forgotten it was there.`,
+`Far down the river, the leaf reaches a place where the water breaks into tiny, glittering foam, and where the foam meets the starlight, something wonderful happens. The worry on the leaf begins to melt. It turns to silver mist. It rises into the air, and becomes a very small, very soft cloud, and the cloud drifts upward, and catches the light of the stars, and glows. And that is all a worry ever is, in the end. A small cloud, that goes away.`,
+`You sit back against the cushion, and let your shoulders fall. There is a space, now, where the worry used to be. It is quiet, and clean, and wide, like a room that has just been swept. And in the space, there is room for a lot of good things: for the sound of the water, and the smell of clover, and the warm, slow beating of your heart.`,
+`You take a long, deep breath, and let it go. You feel, quite suddenly, how very tired you are, and how very nice it is to be tired, with nothing to do, and nowhere to be. The boat rocks. The leaves rustle against its sides, with a sound like a hundred tiny hands saying hush. And you let yourself sink back, and back, into the soft cushion of the night.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 4B: a wish */
+s4_wish: { title:'The Wish Leaf', art:'moonriver|⭐', next:'b4', text:[
+`You lean over the side of the boat, and you choose a leaf. It is a small one, round and cool and silvery, and it rocks, very slightly, as you pick it up. You hold it in the cup of your hands, and you think of something that you wish for. It might be something big, or something small. It might be something you have never told anybody. It does not matter. The river will understand.`,
+`You whisper it, very softly, into the leaf. You do not need to say it aloud. You need only to think it, and breathe it out, and the wish goes from you like a small warm breath, and settles into the shining surface of the leaf, and the leaf glows, for a moment, a pale and gentle gold, as if it had swallowed a little star.`,
+`You lay it on the water, and it floats, and trembles, and then, very slowly, it begins to move. It drifts out among the other leaves, and past the sleeping lily-pads, and out into the wide, dark, quiet river. And as it goes, it glows a little brighter, and a little brighter, like a candle being carried carefully through a long, dark house, until it is the brightest thing on the water.`,
+`Far away down the river, the leaf comes to the place where the water runs out under a long, low arch of willows. And there, in the shadows, a thousand tiny lights are waiting, each one a wish that somebody has sent, in the night, from somewhere in the world. Your leaf joins them, quietly, like one more child coming into a warm room. And the lights all rock together, softly, on the water, and begin to rise.`,
+`They rise, slowly, like the sparks from a fire, up through the leaves of the willows, and into the sky, and they spread out among the stars, and take their places there. And you realise that this is where wishes go. They do not disappear. They become stars. Small, and silver, and patient, they hang in the night above the world, and keep on shining, for as long as it takes.`,
+`You feel strangely calm. You do not know whether your wish will come true, and, somehow, you do not need to know. It is enough that you have made it, and that it is out there, shining, among all the others, being carried safely through the dark. You lean back, and look up, and one of the stars, just above the trees, seems to wink at you. You smile, and let your eyes begin to close.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 4C: a memory */
+s4_memory: { title:'The Memory Leaf', art:'moonriver|✨', next:'b4', text:[
+`You lean over the side of the boat, and you choose a leaf. It is a small one, round and cool and silvery, and it rocks, very slightly, as you pick it up. You hold it in your hands, and you think of something happy from your day, or from the days before. It might be a laugh, or a taste, or the way the sun lay on a wall. It might be the face of someone you love. Let it come. Let it be as clear as you like.`,
+`As you remember it, you feel its warmth rise in your chest, and spread through your hands, and into the leaf. And the leaf begins to glow. It glows with the very colour of the memory, a soft gold, or a warm rose, or a clear, bright blue. It glows more strongly, and the light spills over the edge, and floats on the water, in a small, bright pool, like spilled honey.`,
+`You lay the leaf on the river, and a wonderful thing happens. The glow lifts away from the leaf, and gathers itself together, and takes a shape. It is a small, round, shining fish, no bigger than your thumb, made entirely of light. It flicks its tail, once, and dives, and swims in a lazy circle round the boat, leaving a trail of tiny, glittering bubbles, and it looks up at you with one bright, friendly eye.`,
+`This is your memory, kept safe. It will swim alongside the boat all night, as bright and as warm as it was when you first held it, and no one will ever take it away. It will go with you, wherever the river goes. And when you wake, it will still be there, deep inside you, shining quietly, ready to be remembered again whenever you wish.`,
+`The little fish swims close to the surface, and lights up the water around the boat, so that it looks as if you were floating on a pool of warm, soft light. Other fish come, small and silvery, from all the memories that other people have set afloat, and they swim together in a shining, slow, silent dance, round and round the boat, and then, one by one, they dive, and drift off, down the dark river.`,
+`Yours stays. It swims beside the boat, in the quiet water, keeping you company, glowing very softly, like a little night-light. You lean back against the cushion, with a smile on your face, and let your eyelids fall, and feel the warmth of it all through you, from the crown of your head to the soles of your feet.`
+]},
+
+/* ------------------------------------------------------------------ BRIDGE 4 */
+b4: { title:'The Last Stretch of River', art:'moonriver|🌙', next:'ask5', text: F => [
+by(F,'d',{
+ worry:`The place where your worry used to be is quiet now, quiet and clean and wide. You hardly remember what it was. You only know that it is not there, and that the lightness where it used to sit is the most comfortable thing you have felt all day.`,
+ wish:`Somewhere above you, among the stars, a small new light is shining. You cannot tell which one it is, and you do not need to. You only know that it is up there, and that it is yours, and that somebody, somewhere, is looking after it, gently, as they look after all the others.`,
+ memory:`Beside the boat, your little fish of light swims along, as bright as the moment it was made. Whenever you look at it, you feel the memory again, as warm as a bath, and as gentle as a hand on your hair. It will not leave you. It is perfectly content to swim beside you, all the way home.`}),
+`The boat moves on, through the last of the leaves, and out into the open river, and now the river is hardly moving at all. It has become so wide, and so still, and so deep, that it seems less like a river than like a long road made of dark glass, with the stars set into it. The boat glides on across it, without a sound, as if it were a thought moving through a quiet mind.`,
+`The air is very soft now. It has lost its chill. It lies against your cheeks like a warm, smooth hand. It smells of everything you love best, and you cannot tell what it is. Perhaps it is the smell of your own pillow. Perhaps it is the smell of the tea your grandmother used to make. Perhaps it is only the smell of sleep itself, which is the sweetest smell there is, and which everyone knows, and nobody can describe.`,
+by(F,'b',{
+ fox:`At the far end of the cushion, the fox lets out a long, soft sigh, and stretches one back leg, and goes still. It is dreaming of a mountain-top, and a sky full of small stars, and of a long, cool, quiet night that will never be over.`,
+ mouse:`In the middle of the cushion, the tiny candle has burned down to a small, bright stub, and still the flame does not flicker. The mouse sleeps beside it, in its walnut-shell dream, under its thistledown blanket, on its rose-petal pillow, the smallest mouse in the smallest bed in the biggest and quietest night.`,
+ heron:`At the prow, the heron has not moved at all. It stands there, grey and tall and still, a part of the night itself, like a post in a quiet harbour. It is dreaming of the long, slow, patient river, which has no need to hurry, and always arrives.`}),
+`You can feel your arms getting heavier. They are as heavy as warm sand. They lie on the blanket, quite still, and it would take too much trouble to move them. Your legs are heavy too, and your back, and your neck, and your head. Even your eyelids seem to weigh as much as two coins. And it is all right. It is all right to be heavy. It means you are sinking, softly, into the arms of the night.`,
+`The stars are very close now. They hang just above the water, like lamps in a long, low room, and they are reflected in the dark, so that you seem to be floating in a place with no up and no down, only a soft, deep, silver quiet. The moon has settled low on the horizon, huge, and gold, and slow. Its light lies across everything like a blessing.`,
+`You hear, very faintly, in the distance, the sound of three different places, each one gentle, each one calling to you across the water. You do not need to hurry toward any of them. All three are kind. All three are warm. All three are quiet, and soft, and safe. The boat, which has carried you so patiently all this long night, slows down, and turns, and waits, one last time, for you to say where you would like to rest.`
+]},
+
+/* ------------------------------------------------------------------ FORK 5 */
+ask5: { ask:true, flag:'e', title:'Where the River Ends', art:'starfield|🌙', text:[
+`Ahead of you, the river comes to its end, and the end is three places. To the left, the water rises into a bank of soft, white cloud, so wide and so gentle that it seems like a harbour, with little cloud-moored boats sleeping at their ropes, and the stars shining through it like candles through a curtain.`,
+`Straight ahead, on a small round island, a lighthouse stands, tall and white and slender, with a warm golden light turning slowly at the top, sweeping its long, soft beam across the water, and across your face, and away, and back, like a hand stroking a sleeping child's hair.`,
+`To the right, a garden grows at the water's edge, a quiet garden in the moon's own light, full of tall, pale flowers that open only at night, and bend their heads to the water, and breathe out a scent as sweet as sleep.`,
+`And there are two more places, if you would like them. Behind you, if you turn your head, the silver path of the river curves away the way you came, up through the fields and the sleeping roofs, to a small, familiar window with the curtains open just a little, and a bed beside it with the covers turned back. And beside the water, under a great old willow, a little treehouse sits among the branches, with a round door, and a rope ladder, and a window glowing like a honey-coloured eye.`,
+`Where would you like to rest tonight?`
+], opts:[
+ { t:`The Cloud Harbour, on the left.`, v:'cloud', to: F => 'end_cloud_' + F.c },
+ { t:`The Lighthouse, straight ahead.`, v:'light', to: F => 'end_light_' + F.c },
+ { t:`The Moon's Garden, on the right.`, v:'garden', to: F => 'end_garden_' + F.c },
+ { t:`Home, back along the silver path, to your own warm bed.`, v:'home', to: F => 'end_home_' + F.c },
+ { t:`The Treehouse in the willow, beside the water.`, v:'treehouse', to: F => 'end_treehouse_' + F.c }
+]},
+
+});
+
+/* ================================================================== ENDINGS ==================================================================
+   Nine named endings (where you rest x the sound you followed), each told with the gift, the companion and the thing you set afloat.            */
+const gift = F => by(F,'a',{
+  lantern:`The lantern-flower in your hands glows a deep, steady gold, and its warmth spreads through your fingers, and your wrists, and your arms. It has not dimmed once all night.`,
+  feather:`The feather of listening lies on your pillow, as light as a breath, and it stirs when you breathe, as if it too were sleeping. All the noise in your head has gone quiet.`,
+  flute:`The little sleep-flute lies in the crook of your arm, and now and then, without your touching it, it sighs out one soft, low note, which floats away over the water and does not come back.`});
+const mate = F => by(F,'b',{
+  fox:`The fox curls up at your feet, warm as a hot-water bottle, with its tail round its nose, and murmurs something about small stars. It is already asleep.`,
+  mouse:`The mouse climbs onto your pillow, carrying its tiny candle, and sets it down, and curls up under the edge of your blanket, in the smallest and most comfortable bed in the world.`,
+  heron:`The heron settles on one leg beside you, tall and grey and still, and tucks its head into its feathers, a quiet guardian standing watch over your sleep.`});
+const gone = F => by(F,'d',{
+  worry:`And somewhere far down the river, a small grey cloud that used to be your worry has drifted away on the wind, and is no longer anything at all.`,
+  wish:`And somewhere far above, among the stars, a small new light that used to be your wish keeps shining, patiently, for as long as it takes.`,
+  memory:`And beside you, the little fish of light that used to be your memory swims in slow, silver circles, bright and warm, keeping watch.`});
+
+const closing = F => [
+`The boat comes to rest, with the softest sound there is, the sound of wood meeting water at the end of a long journey. It rocks once, twice, and then it is still. You are here. Everything is quiet. Everything is safe.`,
+gift(F), mate(F), gone(F), epilogue(F)[0],
+`You are so warm, and so heavy, and so deeply comfortable that you could not move if you tried, and you do not try. Your breath goes in, and out, in, and out, as slow as the tide. Your thoughts are drifting, one by one, like leaves on the river, and each one floats away, and nothing follows it.`,
+`The night is all around you, wide and kind and dark. The stars are shining, a long, long way away, and they are looking down on you with great affection. The moon, low and golden, has put its hand upon the world, and all the world is still.`,
+`Goodnight, to the river, which carried you. Goodnight, to the boat, which knew the way. Goodnight, to the owls, and the reeds, and the lanterns, and the stones. Goodnight, to everyone who is sleeping, near and far, in every house, in every country, under every roof.`,
+`And goodnight, to you. You did so well. You listened, and you rested, and you let it all go. Now there is nothing left to do but sleep, and so, quite softly, and quite slowly, and quite without a single worry in the world, you do.`,
+`Sleep now. The river is carrying you home.`
+];
+
+const ENDS = {
+ cloud: { name:'Cloud Harbour', art:'cloudharbor|☁️',
+  core:[
+`The boat turns to the left, and drifts toward the great bank of cloud. As you come closer, you see that it is not one cloud, but many, drawn together into a vast, soft, curving harbour, with wide quays of white vapour, and slow, smoky waves that curl and unfurl without a sound. Little cloud-boats lie moored along the edge, each one asleep, bobbing gently, with a lantern at its prow.`,
+`You glide in between them, as quietly as a dream. The water has turned to mist, and the mist is warm, and the boat sinks into it, deeper and deeper, until it is resting in the very middle of the harbour, on a bed of cloud as soft as a feather mattress. The cloud rises up around you on all sides, like the walls of a nest, and closes over your head, and there, in the pale grey twilight, there is only warmth, and softness, and peace.`
+  ]},
+ light: { name:'The Lighthouse', art:'lighthouse|💡',
+  core:[
+`The boat goes straight ahead, toward the lighthouse, and as you come near, the long gold beam sweeps over you, slowly, like a warm hand, and moves on. It is so gentle that it does not dazzle. It only lights up the water, and the boat, and your own sleepy face, and leaves a faint glow behind it, like the glow of a coal. Sweep, and glow. Sweep, and glow. Slowly, steadily, the light goes round.`,
+`The boat touches a little stone landing at the foot of the tower. There is a small green door, standing open, and inside it a winding staircase, with a handrail worn smooth. At the top, in a round room full of cushions and soft old blankets, there is a narrow bed under the great window, with a quilt on it patched in forty different colours. The lamp turns above your head, slowly, saying sleep, and sleep, and sleep. You climb in, and the quilt rises to meet you.`
+  ]},
+ garden: { name:'the Moon\'s Garden', art:'moongarden|🌼',
+  core:[
+`The boat turns to the right, and slides in against the bank, where the tall pale flowers bend down over the water, as if to greet you. They are moonflowers, as large as dinner plates, as white as milk, and every one of them is open, and breathing out a soft, sweet, honeyed scent that you can taste on the tip of your tongue. The scent drifts over the boat, and over your face, and every breath of it makes you a little sleepier than the last.`,
+`You step out onto the grass, which is thick and cool and springy, and you wander among the flowers, with their great heads nodding all around you. In the middle of the garden, under a silver tree, there is a bed of soft moss, with a pillow of petals, and a blanket of warm, floating moonlight. It is exactly the right size. It is exactly the right softness. You lie down, and the flowers lean over you, like a ring of gentle faces, and begin to hum.`
+  ]},
+ home: { name:'Home', art:'moonwindow|🏠',
+  core:[
+`The boat turns, as softly as a page being turned, and begins to climb back up the silver path. The river that carried you so far now carries you home, and every bend you passed comes by again, slower and softer than before. The reeds, the willows, the sleeping farm with its red barn, and the horse dozing on its feet, all of them lift a hand, or an ear, or a leaf, to say goodnight as you pass.`,
+`The fields give way to rooftops, grey and silver and fast asleep. There is the cat on the wall, still in no hurry. There is the baker's window, glowing, with the smell of tomorrow's bread drifting up through the dark. There is your own street, with its little yellow lamps. And there, at last, is your window, with the curtains open just a little, and the moon looking in, as though it had been keeping the room warm for you.`,
+`The boat slides gently over the sill, and settles. You step out onto the cool floor, and then you climb into your bed, which is exactly as you left it, with the covers turned back, and the pillow still holding the shape of your head. Behind you, with a small, papery rustle, the Moon-Boat folds itself, and folds itself again, until it is a little white paper boat, no bigger than your hand. It sits on the windowsill, in the moonlight, to wait for tomorrow night.`
+  ]},
+ treehouse: { name:'the Treehouse', art:'owlwood|🌳',
+  core:[
+`The boat glides in beside the great old willow, and stops where its long green branches trail in the water. A rope ladder hangs down from the treehouse, swaying very slightly, with a knot at every rung. You climb it, one slow rung at a time, and the willow leaves brush your shoulders and your hair, and whisper, hush, hush, hush, all the way up.`,
+`The round door is open. Inside, the treehouse is small, and warm, and golden, lit by a single lantern that hangs from the ceiling and turns, ever so slowly, on its chain. There is a hammock slung across the middle, deep and soft, with a patchwork blanket in it, and a pillow that smells of cedar and rain. Through the window you can see the river, and the moon, and the stars, all of them very far, and all of them very kind.`,
+`You climb into the hammock, and it takes you in, and rocks. The whole tree rocks with it, a little, as the night wind moves through the branches, so that the house sways like a boat tied up for the night. The leaves hush. The lantern turns. And the old tree, which has stood here for a hundred years, and has seen a great many children fall asleep, holds you up, and does not mind at all.`
+  ]}
+};
+
+/* the sound you followed in the middle of the story comes back to say goodnight */
+const echoes = {
+ cloud: {
+  bell:{ head:'Ending: The Harbour of the Last Bell', t:`From somewhere in the clouds, very softly, you hear the Last Bell, ringing once, as the old tortoise rings it, golden and round. It floats across the harbour, and every little cloud-boat rocks to it, once, like a cradle. And you understand, as it fades, that the Last Bell does not ring only on its island. It rings wherever somebody is ready to rest. It has been ringing for you all night, in every soft thing, and now it rings once more, to tell you that the day is over, and that nothing, nothing at all, has been left undone.` },
+  stones:{ head:'Ending: The Cloud That Hummed', t:`The cloud beneath you begins to hum. It is very low, and very soft, and you realise that it is the song of the stones, which has floated up from the hill and settled in the harbour, and every little wisp of vapour is singing one slow, quiet note of it. The whole harbour hums, like a great, gentle, sleeping instrument, and the hum goes through the cloud, and the boat, and you, and carries every other thought away. It is the oldest lullaby in the world, and it has found you.` },
+  sea:{ head:'Ending: The Whale Cloud', t:`The big, soft cloud under you rises and falls, very slowly, and you realise that it is breathing. It is the great grey whale, who has followed you through the night, and has risen, softly, as a cloud in the sky, to carry you to sleep. Its slow, deep song rolls through the mist around you, and the cloud-boats rock to it, and the stars rock to it, and you rock to it, up and down, up and down, as gently as the sea itself. You are held, by something enormous and kind.` } },
+ light: {
+  bell:{ head:'Ending: The Lighthouse Bell', t:`Beside the lamp, on a bracket, hangs a small bronze bell, green with age, just like the great one on the island. It rings, once, very softly, each time the light goes round, so that the whole night is stitched together, with light, and sound, and light, and sound. Sweep, and glow, and ring. You can hear, in the ringing, the voice of the old tortoise, saying that nothing needs to be finished tonight, and that all of it, everything, can wait until the morning.` },
+  stones:{ head:'Ending: The Lighthouse of Stones', t:`The walls of the round room are built from old grey stones, and as you lie there, you notice that they are humming. Each stone has its own low note, and together they make the chord of the hill, the long, slow, glowing sound of the singing stones. The lamp turns above you, and the stones sing beneath you, and the light and the song go round together, slowly, like two sleepy dancers, and you are in the very middle, held, and warm, and safe.` },
+  sea:{ head:'Ending: The Lighthouse by the Quiet Sea', t:`Through the great window, you can see the sea, wide and dark and calm, with the beam of the lamp laid across it like a path. And far out, in the path, a slow grey back rises from the water, and a plume of silver mist, and the whale sings, once, very low, and the song comes drifting in through the glass. It is a sound that you feel in the bones of the bed. It says, goodnight, little one. It says, I am here. It says, the sea is keeping watch, and so am I.` } },
+ garden: {
+  bell:{ head:'Ending: The Moonflower Bell', t:`Among the flowers, there is one that is not quite like the others. It is shaped like a small white bell, and when the breeze moves it, it rings, very softly, a tiny, silvery, golden note. It is the echo of the Last Bell, which has grown here, in the moonlight, as a flower. Each time it rings, a petal opens, somewhere in the garden, and lets out a little puff of sleepy scent. The old tortoise would be pleased. Nothing needs doing. Nothing needs finishing. Ring, and sleep.` },
+  stones:{ head:'Ending: The Garden of Humming Stones', t:`Scattered among the flowers, you notice small round stones, each one glowing a very little, and each one humming a single low note. They are the children of the singing stones, grown small, and set here to keep the garden company. Their notes mingle with the scent of the flowers, and the breathing of the grass, and become a lullaby so gentle that you cannot tell where it ends and your own breathing begins. The garden sings you to sleep, one soft note at a time.` },
+  sea:{ head:'Ending: The Garden at the Edge of the Sea', t:`Beyond the flowers, the garden slopes down to a quiet shore, and a slow, small, silver sea comes in over the sand, and goes out again, with a long, deep sigh. It comes in, and goes out, in time with your breath. Far away, in the dark, the whale is singing, and the song comes in with the waves, and the waves bring it right to your pillow, so that you fall asleep to the voice of the sea, as every sleeper has always done.` } },
+ home: {
+  bell:{ head:'Ending: Home Again, by the Last Bell', t:`Far away, across the roofs and the fields and the sleeping water, you hear the Last Bell, ringing once from its island, golden and slow. It crosses the whole dark country to reach your window, and by the time it arrives it is hardly a sound at all, only a soft warm hum in the pillow, and in the sheets, and in the quiet of the room. It says that the day is finished. It says that you are exactly where you should be. And that nothing, nothing at all, needs doing before morning.` },
+  stones:{ head:'Ending: The House That Hummed', t:`The room is very quiet, and yet it is not silent. If you listen, you can hear the house itself humming, a very low, round, warm note in the walls, and the floor, and the old wooden bedframe, the song of the stones, which has followed the river home and settled into everything you own. The curtains hum. The blanket hums. Even the moonlight on the floor seems to hum, one slow, comfortable note, going round and round, like a lullaby that your own house has been keeping for you all along.` },
+  sea:{ head:'Ending: The Sea in the Quiet Room', t:`In the quiet of your room, there is a sound, and it is the sea. It is very far off, and very slow, rising and falling, rising and falling, in time with your breath. It is the whale, singing deep down in the dark water, and the song has come all the way home with you, and filled the room like a tide. It rocks the bed, very slightly, like a boat at anchor. And you understand that wherever you sleep, the sea is somewhere beneath you, large and calm and kind, and holding you up.` } },
+ treehouse: {
+  bell:{ head:'Ending: The Treehouse Bell', t:`From the branch beside the window hangs a very small bronze bell, no bigger than a thimble, green with age. When the wind moves the willow, it rings, once, very faintly, and every time it does, you hear the voice of the old tortoise, from its island far away, saying that nothing needs to be finished tonight. Ring, and hush. Ring, and hush. The leaves whisper the answer, and the lantern turns, and the little bell keeps count of the slow, quiet, golden hours.` },
+  stones:{ head:'Ending: The Humming Willow', t:`If you lay your hand on the wall of the treehouse, you can feel a hum in the wood, very low, and very slow, like the note of one of the singing stones, which has found its way, over the water, into the heart of the old tree. The whole willow is humming, from the roots to the leaves, one long soft note, and the hammock hums with it, and you hum with it, without a sound, as it carries you down and down into sleep.` },
+  sea:{ head:'Ending: The Willow Beside the Sea', t:`The wind in the willow leaves sounds exactly like the sea. It comes in, in a long, soft rush, and goes out again, in a sigh, and comes in again, in time with the rocking of the hammock. And somewhere underneath it, very deep and very far, you can hear a slower sound still, the song of the great grey whale, rolling through the dark water below the roots, and rising up through the trunk of the tree like a whisper through a sleeping house.` } }
+};
+
+/* what you carried and who you carried it with, one last time, in a short farewell that is different for every combination */
+const epilogue = F => [
+  by(F,'a',{ lantern:`In the morning, if you look, you may find that your hands are still warm.`, feather:`In the morning, if you look, you may find that your thoughts are still quiet.`, flute:`In the morning, if you listen, you may find that a soft note is still humming somewhere in you.` }) + ' ' +
+  by(F,'b',{ fox:`The fox will be long gone, back to its mountain, and its small stars.`, mouse:`The mouse will be long gone, back to its walnut shell, and its thistledown.`, heron:`The heron will be long gone, back to its river, and its patience.` }) + ' ' +
+  by(F,'d',{ worry:`And the worry that you sent away will not have come back.`, wish:`And the wish that you sent into the sky will still be shining.`, memory:`And the happy memory that you kept will be there, as bright as ever.` })
+];
+
+Object.keys(ENDS).forEach(h => {
+  ['bell','stones','sea'].forEach(s => {
+    const E = ENDS[h], X = echoes[h][s];
+    N['end_' + h + '_' + s] = { title: X.head.replace('Ending: ',''), art: E.art, end: X.head, text: F => E.core.concat([X.t], closing(F)) };
+  });
+});
+})();
+
+</script>
+<script>
 /* UI: rendering, narration (speech synthesis), number-pad input, save/load */
 (function(){
 const G = globalThis.G;
@@ -9750,22 +10432,24 @@ function chooseVoice(){
 }
 const clean = t => String(t||'').replace(/[\u{1F000}-\u{1FFFF}☀-➿⭐★☠▰▱◆►🎲]/gu,'').replace(/[—–]/g,', ').replace(/\s+/g,' ').replace(/&/g,' and ').trim();
 function stopSpeech(){ SP.gen++; SP.speaking=false; if (synth){ try{ synth.cancel(); }catch(e){} } document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); updateVoiceBtns(); }
-function runUnits(units){
+function runUnits(units, onDone, onFail){
   stopSpeech(); if (!SP.on || !synth || !units.length) return;
   const gen = ++SP.gen; SP.units = units; SP.speaking = true; updateVoiceBtns(); let started = false;
   const v = chooseVoice();
   const next = (i, retry) => {
     if (gen !== SP.gen) return;
-    if (i >= units.length){ SP.speaking=false; updateVoiceBtns(); return; }
-    const u = units[i]; const txt = clean(u.text);
+    if (i >= units.length){ SP.speaking=false; updateVoiceBtns(); if (onDone) onDone(); return; }
+    const u = units[i];
+    if (u.pause){ setTimeout(()=>{ if (gen===SP.gen) next(i+1); }, u.pause); return; }
+    const txt = clean(u.text);
     if (!txt){ next(i+1); return; }
-    const ut = new SpeechSynthesisUtterance(txt); if (v) ut.voice = v; ut.rate = SP.rate; ut.pitch = 0.95; ut.volume = 1;
-    ut.onstart = () => { started = true; if (gen!==SP.gen) return; document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); if (u.el){ u.el.classList.add('speaking'); try{ u.el.scrollIntoView({block:'nearest'}); }catch(e){} } };
+    const ut = new SpeechSynthesisUtterance(txt); if (v) ut.voice = v; ut.rate = SP.rate * (SP.mult||1); ut.pitch = SP.pitch || 0.95; ut.volume = 1;
+    ut.onstart = () => { started = true; if (gen!==SP.gen) return; if (u.cb) u.cb(); document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); if (u.el){ u.el.classList.add('speaking'); try{ u.el.scrollIntoView({block:'nearest'}); }catch(e){} } };
     ut.onend = () => { if (gen!==SP.gen) return; if (u.el) u.el.classList.remove('speaking'); next(i+1); };
     ut.onerror = () => { if (gen!==SP.gen) return; next(i+1); };
     if (i===0){ setTimeout(()=>{ if (gen!==SP.gen || started) return;
       if (!retry){ try{ synth.cancel(); }catch(e){} setTimeout(()=>{ if (gen===SP.gen && !started) next(0, true); }, 60); }   /* some browsers drop the first utterance: try once more */
-      else { SP.speaking=false; updateVoiceBtns(); } }, retry ? 3500 : 1800); }
+      else { SP.speaking=false; updateVoiceBtns(); if (onFail) onFail(i); } }, retry ? 3500 : 1800); }
     try{ synth.resume(); }catch(e){}
     synth.speak(ut);
   };
@@ -9970,6 +10654,7 @@ document.addEventListener('keydown', e => {
   const tgt = e.target && e.target.tagName;
   if (tgt==='INPUT' || tgt==='SELECT' || tgt==='TEXTAREA'){ if (e.key==='Enter' && e.target.id==='nameIn') { e.preventDefault(); nameDone(); } return; }
   if (e.ctrlKey||e.metaKey||e.altKey) return;
+  if (mode==='bed' && !modalOpen && G.bed && G.bed.onKey(e)) return;
   let n = null;
   if ((e.code==='Digit0' || e.code==='Numpad0') && mode==='title' && !modalOpen && CUR){ const z = CUR.opts.find(o=>o.zero); if (z && z.fn){ e.preventDefault(); z.fn(); return; } }
   if (/^Numpad[1-9]$/.test(e.code)) n = +e.code.slice(6); else if (/^Digit[1-9]$/.test(e.code)) n = +e.code.slice(5);
@@ -10047,6 +10732,7 @@ const sk = (b, st) => (st||'ashen')==='ashen' ? b : b+'_'+st;       // per-story
 const storyIds = () => Object.keys(G.stories).filter(k=>G.stories[k].title);
 function setBrand(t){ const b=$('#brand'); if (b) b.textContent = '⚜ ' + t; }
 function toTitle(){
+  if (G.bed) G.bed.stop(); document.body.classList.remove('bed');
   stopSpeech(); mode='title'; S=null; closeModal(); setHeader(); setBrand('BYOA · Build Your Own Adventure Story Building');
   setArt('title|📖 ✨', 'library', 'Choose your story', '');
   const opts = storyIds().map(id => { const st=G.stories[id]; const saved=!!LS.get(sk('aq_save',id));
@@ -10067,8 +10753,8 @@ function storyMenu(id){
   renderScreen({ art:st.art, title:st.title, card:true, opts, wxline:false, text:st.intro }, { silent:false });
   renderRight();
 }
-function loadSave(id){ const j = LS.get(sk('aq_save',id)); if (!j) return; try { S = G.restore(j); S.cp = LS.get(sk('aq_cp',id)); renderGame(); } catch(e){ toast('Could not load save'); } }
-function startCreate(id){ CR = { story:id, name:'', cls:null, origin:null, skills:[] }; setBrand(G.stories[id].title); stepName(); }
+function loadSave(id){ const j = LS.get(sk('aq_save',id)); if (!j) return; if (G.stories[id].bedtime && G.bed){ G.bed.start(id, true); return; } try { S = G.restore(j); S.cp = LS.get(sk('aq_cp',id)); renderGame(); } catch(e){ toast('Could not load save'); } }
+function startCreate(id){ if (G.stories[id].bedtime && G.bed){ G.bed.start(id, false); return; } CR = { story:id, name:'', cls:null, origin:null, skills:[] }; setBrand(G.stories[id].title); stepName(); }
 const CT = () => G.stories[CR.story].create;
 const inStory = obj => Object.keys(obj).filter(k => (obj[k].story||'ashen') === CR.story);
 function createScreen(art, title, text, opts, pre, post){ mode='create'; setArt(art,'create'+title,title,''); renderScreen({ art, title, text, opts, wxline:false, preHtml:pre, postHtml:post }); renderRight(); }
@@ -10107,10 +10793,10 @@ function stepConfirm(){
 
 /* ===================== BOOT ===================== */
 window.addEventListener('DOMContentLoaded', () => {
-  $('#bVoice').onclick = () => { SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); else if (SP.pending && mode==='play') runUnits(SP.pending); updateVoiceBtns(); };
+  $('#bVoice').onclick = () => { SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); else if (SP.pending && mode==='play') runUnits(SP.pending); updateVoiceBtns(); if (mode==='bed' && G.bed) G.bed.voiceChanged(); };
   $('#bOpts').onclick = () => { SP.opts=!SP.opts; LS.set('aq_read_opts',SP.opts?'1':'0'); updateVoiceBtns(); };
   $('#bMenu').onclick = openMenu;
-  $('#bSkip').onclick = stopSpeech;
+  $('#bSkip').onclick = () => { if (mode==='bed' && G.bed) G.bed.skip(); else stopSpeech(); };
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab=b.dataset.t; renderRight(); });
   const aside = $('aside'); const closePanel = () => aside.classList.remove('open');
   $('#bPanel').onclick = () => { renderRight(); aside.classList.toggle('open'); };
@@ -10122,6 +10808,7 @@ window.addEventListener('DOMContentLoaded', () => {
   G.narrOn = LS.get('aq_rich') !== '0';
   updateVoiceBtns(); toTitle();
 });
+window.AQ_UI = { runUnits, stopSpeech, SP, setArt, setBrand, setHeader, esc, sentences, toast, toTitle, LS, sk, updateVoiceBtns, openMenu, setMode(m){ mode=m; }, getMode(){ return mode; }, setCUR(c){ CUR=c; }, clear(){ S=null; } };
 window.AQ = { get S(){ return S; }, renderGame, toTitle, save, setState(x){ S=x; renderGame(true); }, setTab(t){ tab=t; renderRight(); } };
 })();
 

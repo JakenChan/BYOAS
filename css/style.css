@@ -179,3 +179,22 @@ aside{display:flex;flex-direction:column;min-height:0;background:var(--panel)}
   .opt{padding:7px 10px;min-height:42px;font-size:15px}
 }
 @media (prefers-reduced-motion:reduce){.actor,.rainfx,.snowfx,.fogfx,.windfx,.flash,.scene .s{animation:none}}
+
+/* ===== bedtime stories: one quiet column, soft colours ===== */
+body.bed #app{grid-template-columns:minmax(0,1fr)}
+body.bed aside,body.bed #bPanel,body.bed #bOpts,body.bed .bars{display:none!important}
+body.bed main{border-right:0}
+body.bed #story{background:radial-gradient(ellipse at top,#10172e,#0a0e1c);padding:22px clamp(18px,8vw,120px) 12px}
+body.bed .scene.bedscene{font-size:clamp(19px,2.2vw,23px);line-height:1.95;color:#cdd5ee;max-width:46em;margin:0 auto}
+body.bed .scene.bedscene .s{animation:none}
+body.bed .scene.bedscene .speaking{background:#9fb4ff1a;box-shadow:0 0 0 4px #9fb4ff1a;color:#f4f6ff}
+body.bed .bp{margin:0 0 18px}
+body.bed .bp.dim{color:#8a93b4;font-style:italic;font-size:.9em}
+body.bed .bhead{font-variant:small-caps;letter-spacing:.14em;color:#e8d9a8;font-size:1.1em;margin:6px 0 16px;text-align:center}
+body.bed .asknote{margin-top:18px;padding-top:12px;border-top:1px solid #2b3558;color:#a9b4da}
+body.bed #opts{background:#0a0e1c;border-top:1px solid #222b4a}
+.bedctl{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+.bedctl .bb{padding:6px 14px;background:#121a34;color:#c9d2f0;border:1px solid #2b3764;border-radius:18px;font:14px system-ui;cursor:pointer}
+.bedctl .bb:hover{border-color:#6a7ec8}
+.dicebar{margin:8px 2px 4px;color:#b9c4ee;font:15px system-ui}
+body.dim #app{filter:brightness(.4) saturate(.6)}

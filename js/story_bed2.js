@@ -1,0 +1,96 @@
+/* THE MOON-BOAT — part 2: the long water, the third fork (a far-off sound) and the fourth fork (what to set afloat). */
+(function(){
+const G = globalThis.G, N = G.bedNodes.moonboat;
+const by = (F, k, m) => m[F[k]] || '';
+
+Object.assign(N, {
+
+/* ------------------------------------------------------------------ BRIDGE 2 */
+b2: { title:'The Misty Lake', art:'moonriver|🌫️', next:'ask3', text: F => [
+`The jetty slips away behind you, and the little lantern at its end grows small, and smaller, until it is only a yellow spark, and then it is gone. The river takes up the boat again. It is wider now, and darker, and calmer, and it moves so slowly that you can scarcely feel it moving at all. The only way to tell is to watch the banks, which drift past you, a little at a time, like pictures in a very old book.`,
+by(F,'b',{
+ fox:`The fox sleeps at the far end of the cushion, with its tail curled over its nose. Every so often one of its ears twitches, and its paws make small, running movements in the air, as though it were chasing something soft and golden through a dream. Its breathing is slow and warm, and you can feel it, faintly, through the floor of the boat, like the purring of a very quiet engine.`,
+ mouse:`The mouse sleeps in the middle of the cushion, curled around the foot of its little candle, which burns on, steady and small, and does not flicker. Its nightcap has slipped down over one eye. Its breathing is so tiny, and so light, that it hardly stirs the fur on its chest, and it makes a sound no bigger than the turning of a page.`,
+ heron:`The heron sleeps at the prow, standing on one leg, with its head tucked into its shoulders. It is quite motionless, like a statue of a bird, and the moonlight lies along its grey back as silver as frost. When the boat sways, it sways with it, gently, and does not wake. Even in its sleep, it seems to be listening to the river.`}),
+`The banks fall away, one on each side, and the river opens out into a wide, round lake, as still as a bowl of milk. A mist lies over it, low and white and soft, no higher than your knees, so that the boat seems to be sailing through a cloud. Everything beyond the mist has softened, and blurred, and grown quiet. The moon is a pale, round smudge of light. The stars are faint and far away.`,
+`Here and there, small islands rise out of the whiteness, each with a single tree on it, and each tree is hung with a few pale, glowing lanterns, like a Christmas tree in a dream. You glide past one, and then another, and then a third, and they are so still and so silent that you almost feel you should whisper, even though there is nobody to wake.`,
+`The water makes a small sound as it slides along the side of the boat. A sleepy, pleasant, rippling sound. Shhh. Shhh. Shhh. It is the sound that your own breath makes when you let it all out at the end of a long day. Shhh. You find that you are breathing in time with it, in, and out, in, and out, and each breath is a little slower than the last.`,
+`You notice that your eyelids have grown heavy. They are as heavy as two little curtains, and every time you blink, they take a little longer to open again. You do not mind. You let them close, just for a moment, and then you open them, and the mist is still there, and the lake is still there, and the boat is still drifting, as softly as ever. There is nothing to wake up for. There is nothing to be anxious about.`,
+`And as you drift, you begin to hear something. Not one thing, but three, far off, each one very quiet, each one coming from a different direction across the lake. They are so faint that at first you think you must be imagining them. But the boat has slowed, and turned a little, and seems to be listening too. It is as if it were saying, which of these would you like to follow?`
+]},
+
+/* ------------------------------------------------------------------ FORK 3 */
+ask3: { ask:true, flag:'c', title:'Three Faraway Sounds', art:'moonriver|🔔', text:[
+`The first sound comes from the left, through the mist: a bell. It is a deep, round, golden bell, struck very slowly, once, and then, a long while later, once again. Each stroke hangs in the air, and floats, and fades, like a soap bubble drifting away.`,
+`The second sound comes from straight ahead: a low, gentle humming, as if a great many voices were singing the same long note together, very softly, in a place with stone walls. It rises, and holds, and falls, and rises again.`,
+`The third sound comes from the right, and from very far away: a deep, slow, rolling sound, like a song sung by something enormous and tender, that has all the time in the world. It sounds like the sea, and it sounds like a voice, and it sounds like both at once.`,
+`Which sound would you like the boat to follow?`
+], opts:[
+ { t:`The golden bell, on the left.`, v:'bell', to:'s3_bell' },
+ { t:`The soft humming of voices, straight ahead.`, v:'stones', to:'s3_stones' },
+ { t:`The deep, slow song of the sea, on the right.`, v:'sea', to:'s3_sea' }
+]},
+
+/* ------------------------------------------------------------------ BRANCH 3A: the bell */
+s3_bell: { title:'The Island of the Last Bell', art:'belltower|🔔', next:'b3', text:[
+`The boat turns to the left, and follows the bell. It is a long, slow journey, and you do not mind it at all, for each time the bell rings, the sound seems to travel across the water and settle inside you, deep in your chest, where it hums for a while, warm and round, before it fades. By the time the third stroke has come, you feel as though you have been rocked in a very large pair of arms.`,
+`The mist thins, and a small island appears, round and green and gentle, like a loaf of bread. At the top of it stands a tower, a short, stout, old stone tower, with a pointed roof, and a single window under the eaves, glowing a soft yellow. In the window hangs a great bronze bell, as big as a barrel, green with age. And beside the bell, on a stool, sits a very old tortoise, in a pair of round spectacles, with a rope in its hand.`,
+`The boat bumps softly against the little stone landing. The tortoise looks down, slowly, over the top of its spectacles. Ah, it says. A visitor. How lovely. Come up, come up, there is no hurry. There is never any hurry here. You step out onto the landing, and climb the steps, which are worn smooth and shallow by many years of slow feet, and they take you up to the window, where the tortoise is waiting.`,
+`I am the keeper of the Last Bell, says the tortoise. Every night, when the world is ready to rest, I ring it once. Just once. And everyone who hears it knows that the day is over, and that whatever was not finished can wait until morning. It is a very old custom. I have been doing it for four hundred years, and I have not missed a night. Would you like to ring it?`,
+`You nod. The tortoise hands you the rope. It is thick, and soft, and warm from its hand, and it is as long as a river. You take it in both hands, and you pull, slowly, slowly, and the great bell swings, and swings, and then, with a deep, golden boom that you feel in your feet and your knees and your ribs, it rings.`,
+`The sound rolls out over the water, wide and slow, and as it goes, you feel something go out of you with it. It is the last of the day's small cares, the tight little knots of worry you did not even know you were holding, all of them loosening, and drifting away on the long golden note, out over the lake and the mist and the sleeping islands, until you cannot feel them any more. How good that feels. How light. How quiet.`,
+`The bell hums on, long after the stroke has gone. The tortoise smiles. That is the Last Bell, it says. Nothing else is needed. Goodnight, dear traveller. You thank it, though you hardly have the breath to speak, and the tortoise waves one wrinkled foot, and you go back down the steps and into the boat, and you sit, and the boat turns, and the bell sounds once more behind you, very soft, and very far, like a heartbeat in the night.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 3B: the stones */
+s3_stones: { title:'The Hill of Singing Stones', art:'singingstones|🎵', next:'b3', text:[
+`The boat goes straight ahead, toward the humming, and the sound grows slowly clearer, a deep, round, flowing hum, like a hundred voices singing a single long note in a great cool hall. It does not stop. It does not hurry. It simply goes on, and on, breathing in, and out, and in, and out, and the breath of it is as slow as the breath of someone fast asleep.`,
+`The mist lifts, and a low green hill rises from the water, with a gentle, curved top, like the back of a sleeping cow. And on the hill, standing in a wide ring, are stones. They are tall and smooth and grey, and each one is as round-shouldered as an old man in a long cloak, and each one has a small, soft, silvery light, glowing, deep inside it. And each one is singing.`,
+`Every stone sings one note, and one note only. The tall ones sing low, and the short ones sing high, and the round ones sing in the middle, and together they make a great, slow, slowly changing chord, like a sunrise made of sound. When one stone stops to breathe, another takes up its note, so that the song itself never stops, but flows round the ring, from stone to stone, as gently as water going round a pool.`,
+`The boat slides up to the shore, and you step out onto the grass, which is cool and soft and dry. You walk, slowly, toward the ring. As you pass between the stones, you can feel their song in your skin, in your hands, in the bones of your face. It is a good feeling, like having your back rubbed. It makes you want to close your eyes. So, at the centre of the ring, where the grass is thickest and softest, you lie down, and look up.`,
+`And above you, the sky is full of stars, so many that the dark between them seems hardly to be there. The stones sing, all around you, low and slow. And you begin to understand that these stones have been here since before there were people, and that they have heard every lullaby that was ever sung, by every mother, and every father, and every grandmother, in every language, in every house, in every century. The stones remember them all.`,
+`They are singing them now, all together, so quietly and so softly that they are all one song. You can almost hear them: a cradle-song from the hills, a hush-a-bye from the sea, a tune that someone hummed to you, a long time ago, when you were very, very small, and did not know that you would remember it. The stones sing it back to you, and it fills you up, like warm milk, and you feel, from head to foot, safe, and loved, and sleepy.`,
+`You lie there for a long, long while, and the stones sing, and the stars turn, and the grass is soft. When you are ready, you rise, slowly, as slowly as a sleeper rolling over in bed, and you walk back to the boat. The nearest stone gives one last, low, warm note, as if to say goodnight, and you step in, and the boat glides away, with the humming following you, quieter and quieter, across the water.`
+]},
+
+/* ------------------------------------------------------------------ BRANCH 3C: the sea */
+s3_sea: { title:'The Quiet Sea', art:'quietsea|🐋', next:'b3', text:[
+`The boat turns to the right, toward the far, deep song, and the lake begins to open, wider and wider, until there is no shore at all. The mist rolls away. And you find that you are floating on the sea, a great, dark, quiet sea, as flat and smooth as black glass, with the whole sky lying in it, upside down. Every star is there twice, once above you, and once below you, so that the boat seems to hang in the very middle of the universe, with nothing above and nothing beneath.`,
+`The song is louder now. It rolls across the water, long and deep and slow, a note that begins very low, and rises, and rises, and then falls again, softly, like a sigh. You feel it in the boat. You feel it in the water. You feel it in the middle of your chest, a kind of gentle, rocking tremble, like the purr of the biggest cat in the world.`,
+`And then, quite close, the water stirs. A great, dark, smooth shape rises beside the boat, quite slowly, without a ripple, and it is the largest living thing you have ever seen. It is a whale. It is as long as a street, and as grey as the sea at dusk, and its skin is dotted with small pale barnacles, like a sky dotted with stars. It turns one enormous, dark, kindly eye toward you, and the eye is as deep and gentle as a well.`,
+`The whale does not speak, for whales do not need words. It only sings, softly, so softly that the water barely moves, and you find that you understand it perfectly. It is saying, welcome. It is saying, there is room for everyone in the sea. It is saying, the night is long, and kind, and wide, and nothing in it is anything to be afraid of. Rest. Rest. Rest.`,
+`The whale swims beside the boat, so slowly, and so smoothly, that the boat hardly rocks. Its great back rises and falls, like a hill, and when it breathes out, a soft, silver mist rises from it, and drifts across the water, and falls on your face like the gentlest rain. It smells of salt, and of faraway places, and of old, calm, sleeping things. You breathe it in.`,
+`The whale sings again, a long, low, rolling note, and the sea sings it back, and the sky seems to sing it too, so that you are sitting inside a song, with the notes going all around you like warm water. Your arms grow heavy. Your head rolls gently back against the side of the boat. You feel as if you were being rocked in a cradle that is as big as the world.`,
+`After a long, long time, the whale sinks, as slowly as it rose, without a sound. The sea closes over its great back, in one long, smooth, silver ring, and the ring widens, and widens, and fades. But the song goes on, far down in the deep, and you can feel it through the bottom of the boat for a long time afterwards, a slow, soft, drowsy hum, like a heartbeat, saying goodnight, and goodnight, and goodnight.`
+]},
+
+/* ------------------------------------------------------------------ BRIDGE 3 */
+b3: { title:'Heavy Eyelids', art:'moonriver|🌙', next:'ask4', text: F => [
+by(F,'c',{
+ bell:`The sound of the Last Bell is still in the air, though it has been a long time since it rang. It has become part of the night. You can hear it in the quiet between your breaths, a soft, golden humming, like a bee on a summer afternoon. Every time you breathe out, a little more of the day slips away.`,
+ stones:`The song of the stones is still with you, though the hill is far behind. It has settled into the lowest, quietest part of your mind, and goes on there by itself, slow, and round, and warm, like a fire that has burned down to embers. You do not have to listen to it. It listens to you.`,
+ sea:`The whale's song is still with you, though the sea has closed over it. It lingers in the boat, in the water, in the soles of your feet. It has become part of the way you breathe. Long, and slow, and deep. In, and out. Like waves arriving on a quiet shore, and going back, and arriving again.`}),
+`The boat drifts on. The river has found its way again, and it is narrower now, and quieter, and it moves so slowly that the stars seem to be moving faster than the water. The banks are lined with tall grass, and long, bending branches, and in the grass, here and there, are small, round, pale flowers that glow very faintly, and close, one by one, as you pass them. Goodnight, they seem to say. Goodnight.`,
+by(F,'b',{
+ fox:`The fox murmurs in its sleep, and turns over, and tucks its nose a little deeper into its tail. A soft little snore comes out of it, no louder than a kettle thinking about boiling. You smile, and reach across, very gently, and tuck the end of your blanket over its paws.`,
+ mouse:`The mouse turns over in its sleep, and the nightcap slips off altogether, and it does not notice. A tiny snore comes out, the size of a pin, and fades. You lift the nightcap, very carefully, between a finger and a thumb, and lay it back over the small round head, and the mouse sighs, and sleeps on.`,
+ heron:`The heron shifts its weight from one leg to the other, without waking, and settles again. Its feathers ruffle in the breeze, and lie flat. It looks, for a moment, almost like a part of the boat itself, a tall grey mast, with a sleeping head, and the moon behind it. You let your gaze rest on it, and the moon, and the water, and everything goes soft at the edges.`}),
+`You yawn, a long, slow, comfortable yawn, the kind that begins in your stomach and goes all the way up, and stretches your whole face. And then you yawn again. It is such a pleasant thing, a yawn. It means that you are nearly there. It means that the day has done with you, and the night is taking over, and all you have to do is let it.`,
+`The moon is lower now, and larger, and more golden. It hangs just above the treetops, and its light lies on the water like a long, warm path. You feel as though you could step out of the boat onto the path and walk all the way to the moon, and it would hold you up, and you would not be a bit afraid. But the boat is so comfortable, and the cushion is so soft, that you stay where you are, and let the path come to you.`,
+`Everything that you were carrying with you tonight, everything that you brought from the day, is beginning to feel a little heavy. Not a bad heavy. Only the kind of heavy that comes from carrying something for a long time, and being ready, now, to put it down. The boat seems to feel it too. It sits a little lower in the water. It is as if it were saying, there is no need to hold on to anything any more.`,
+`And then, as you drift round a long, slow bend, you see that the water ahead is quite still, and clear, and shallow, and dotted all over with leaves. They are floating leaves, hundreds of them, small, and round, and silvery green, drifting on the surface like a field of little lily-pads, each one waiting, quite patiently, for something to be set upon it.`
+]},
+
+/* ------------------------------------------------------------------ FORK 4 */
+ask4: { ask:true, flag:'d', title:'The Floating Leaves', art:'moonriver|🍃', text:[
+`The boat slows among the leaves, and stops, as if it knew that this was a place for stopping. A soft voice, which might be the water, or the night, or your own thoughts, tells you what the leaves are for. They are for setting things afloat. You can place something on a leaf, and send it away down the river, and the river will carry it off, into the dark, where it will be turned into something gentle.`,
+`You have room for one thing, tonight. It might be a worry, one that has been following you around, heavy and small, and which you are quite ready to be rid of. It might be a wish, something that you hope for, and would like the river to carry to wherever wishes are kept. Or it might be a happy memory, a good moment from your day, or from long ago, which you would like to keep safe, and warm, and shining, as you fall asleep.`,
+`What would you like to set afloat?`
+], opts:[
+ { t:`A worry, to let the river take it away.`, v:'worry', to:'s4_worry' },
+ { t:`A wish, to send out into the night.`, v:'wish', to:'s4_wish' },
+ { t:`A happy memory, to keep it shining.`, v:'memory', to:'s4_memory' }
+]},
+
+});
+})();

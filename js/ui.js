@@ -20,22 +20,24 @@ function chooseVoice(){
 }
 const clean = t => String(t||'').replace(/[\u{1F000}-\u{1FFFF}☀-➿⭐★☠▰▱◆►🎲]/gu,'').replace(/[—–]/g,', ').replace(/\s+/g,' ').replace(/&/g,' and ').trim();
 function stopSpeech(){ SP.gen++; SP.speaking=false; if (synth){ try{ synth.cancel(); }catch(e){} } document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); updateVoiceBtns(); }
-function runUnits(units){
+function runUnits(units, onDone, onFail){
   stopSpeech(); if (!SP.on || !synth || !units.length) return;
   const gen = ++SP.gen; SP.units = units; SP.speaking = true; updateVoiceBtns(); let started = false;
   const v = chooseVoice();
   const next = (i, retry) => {
     if (gen !== SP.gen) return;
-    if (i >= units.length){ SP.speaking=false; updateVoiceBtns(); return; }
-    const u = units[i]; const txt = clean(u.text);
+    if (i >= units.length){ SP.speaking=false; updateVoiceBtns(); if (onDone) onDone(); return; }
+    const u = units[i];
+    if (u.pause){ setTimeout(()=>{ if (gen===SP.gen) next(i+1); }, u.pause); return; }
+    const txt = clean(u.text);
     if (!txt){ next(i+1); return; }
-    const ut = new SpeechSynthesisUtterance(txt); if (v) ut.voice = v; ut.rate = SP.rate; ut.pitch = 0.95; ut.volume = 1;
-    ut.onstart = () => { started = true; if (gen!==SP.gen) return; document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); if (u.el){ u.el.classList.add('speaking'); try{ u.el.scrollIntoView({block:'nearest'}); }catch(e){} } };
+    const ut = new SpeechSynthesisUtterance(txt); if (v) ut.voice = v; ut.rate = SP.rate * (SP.mult||1); ut.pitch = SP.pitch || 0.95; ut.volume = 1;
+    ut.onstart = () => { started = true; if (gen!==SP.gen) return; if (u.cb) u.cb(); document.querySelectorAll('.speaking').forEach(e=>e.classList.remove('speaking')); if (u.el){ u.el.classList.add('speaking'); try{ u.el.scrollIntoView({block:'nearest'}); }catch(e){} } };
     ut.onend = () => { if (gen!==SP.gen) return; if (u.el) u.el.classList.remove('speaking'); next(i+1); };
     ut.onerror = () => { if (gen!==SP.gen) return; next(i+1); };
     if (i===0){ setTimeout(()=>{ if (gen!==SP.gen || started) return;
       if (!retry){ try{ synth.cancel(); }catch(e){} setTimeout(()=>{ if (gen===SP.gen && !started) next(0, true); }, 60); }   /* some browsers drop the first utterance: try once more */
-      else { SP.speaking=false; updateVoiceBtns(); } }, retry ? 3500 : 1800); }
+      else { SP.speaking=false; updateVoiceBtns(); if (onFail) onFail(i); } }, retry ? 3500 : 1800); }
     try{ synth.resume(); }catch(e){}
     synth.speak(ut);
   };
@@ -240,6 +242,7 @@ document.addEventListener('keydown', e => {
   const tgt = e.target && e.target.tagName;
   if (tgt==='INPUT' || tgt==='SELECT' || tgt==='TEXTAREA'){ if (e.key==='Enter' && e.target.id==='nameIn') { e.preventDefault(); nameDone(); } return; }
   if (e.ctrlKey||e.metaKey||e.altKey) return;
+  if (mode==='bed' && !modalOpen && G.bed && G.bed.onKey(e)) return;
   let n = null;
   if ((e.code==='Digit0' || e.code==='Numpad0') && mode==='title' && !modalOpen && CUR){ const z = CUR.opts.find(o=>o.zero); if (z && z.fn){ e.preventDefault(); z.fn(); return; } }
   if (/^Numpad[1-9]$/.test(e.code)) n = +e.code.slice(6); else if (/^Digit[1-9]$/.test(e.code)) n = +e.code.slice(5);
@@ -317,6 +320,7 @@ const sk = (b, st) => (st||'ashen')==='ashen' ? b : b+'_'+st;       // per-story
 const storyIds = () => Object.keys(G.stories).filter(k=>G.stories[k].title);
 function setBrand(t){ const b=$('#brand'); if (b) b.textContent = '⚜ ' + t; }
 function toTitle(){
+  if (G.bed) G.bed.stop(); document.body.classList.remove('bed');
   stopSpeech(); mode='title'; S=null; closeModal(); setHeader(); setBrand('BYOA · Build Your Own Adventure Story Building');
   setArt('title|📖 ✨', 'library', 'Choose your story', '');
   const opts = storyIds().map(id => { const st=G.stories[id]; const saved=!!LS.get(sk('aq_save',id));
@@ -337,8 +341,8 @@ function storyMenu(id){
   renderScreen({ art:st.art, title:st.title, card:true, opts, wxline:false, text:st.intro }, { silent:false });
   renderRight();
 }
-function loadSave(id){ const j = LS.get(sk('aq_save',id)); if (!j) return; try { S = G.restore(j); S.cp = LS.get(sk('aq_cp',id)); renderGame(); } catch(e){ toast('Could not load save'); } }
-function startCreate(id){ CR = { story:id, name:'', cls:null, origin:null, skills:[] }; setBrand(G.stories[id].title); stepName(); }
+function loadSave(id){ const j = LS.get(sk('aq_save',id)); if (!j) return; if (G.stories[id].bedtime && G.bed){ G.bed.start(id, true); return; } try { S = G.restore(j); S.cp = LS.get(sk('aq_cp',id)); renderGame(); } catch(e){ toast('Could not load save'); } }
+function startCreate(id){ if (G.stories[id].bedtime && G.bed){ G.bed.start(id, false); return; } CR = { story:id, name:'', cls:null, origin:null, skills:[] }; setBrand(G.stories[id].title); stepName(); }
 const CT = () => G.stories[CR.story].create;
 const inStory = obj => Object.keys(obj).filter(k => (obj[k].story||'ashen') === CR.story);
 function createScreen(art, title, text, opts, pre, post){ mode='create'; setArt(art,'create'+title,title,''); renderScreen({ art, title, text, opts, wxline:false, preHtml:pre, postHtml:post }); renderRight(); }
@@ -377,10 +381,10 @@ function stepConfirm(){
 
 /* ===================== BOOT ===================== */
 window.addEventListener('DOMContentLoaded', () => {
-  $('#bVoice').onclick = () => { SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); else if (SP.pending && mode==='play') runUnits(SP.pending); updateVoiceBtns(); };
+  $('#bVoice').onclick = () => { SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); else if (SP.pending && mode==='play') runUnits(SP.pending); updateVoiceBtns(); if (mode==='bed' && G.bed) G.bed.voiceChanged(); };
   $('#bOpts').onclick = () => { SP.opts=!SP.opts; LS.set('aq_read_opts',SP.opts?'1':'0'); updateVoiceBtns(); };
   $('#bMenu').onclick = openMenu;
-  $('#bSkip').onclick = stopSpeech;
+  $('#bSkip').onclick = () => { if (mode==='bed' && G.bed) G.bed.skip(); else stopSpeech(); };
   document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab=b.dataset.t; renderRight(); });
   const aside = $('aside'); const closePanel = () => aside.classList.remove('open');
   $('#bPanel').onclick = () => { renderRight(); aside.classList.toggle('open'); };
@@ -392,5 +396,6 @@ window.addEventListener('DOMContentLoaded', () => {
   G.narrOn = LS.get('aq_rich') !== '0';
   updateVoiceBtns(); toTitle();
 });
+window.AQ_UI = { runUnits, stopSpeech, SP, setArt, setBrand, setHeader, esc, sentences, toast, toTitle, LS, sk, updateVoiceBtns, openMenu, setMode(m){ mode=m; }, getMode(){ return mode; }, setCUR(c){ CUR=c; }, clear(){ S=null; } };
 window.AQ = { get S(){ return S; }, renderGame, toTitle, save, setState(x){ S=x; renderGame(true); }, setTab(t){ tab=t; renderRight(); } };
 })();
