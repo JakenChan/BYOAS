@@ -72,6 +72,7 @@ function tagHtml(t){
     case 'mp': return `<span class="tag ${t.v<0?'neg':'pos'}">${t.v<0?'−':'+'}${Math.abs(t.v)} ${mpL()}</span>`;
     case 'gold': return `<span class="tag ${t.v<0?'neg':'xp'}">${t.v<0?'−':'+'}${isKid()?'$':''}${Math.abs(t.v)}${isKid()?'':' 🪙'}</span>`;
     case 'xp': return `<span class="tag xp">+${t.v} XP</span>`;
+    case 'kids': return `<span class="tag ${t.v<0?'neg':'pos'}">${t.v<0?'\u2212':'+'}${Math.abs(t.v)} \u{1F467} children</span>`;
     case 'item': return `<span class="tag ${t.v<0?'neg':'item'}">${t.v<0?'−':'+'}${it?it.icon+' '+it.n:t.id}${Math.abs(t.v)>1?' ×'+Math.abs(t.v):''}</span>`;
     case 'skill': return `<span class="tag lvl">✦ Learned ${G.skills[t.id]?G.skills[t.id].n:t.id}</span>`;
     case 'stat': return `<span class="tag ${t.v<0?'neg':'pos'}">${t.v<0?'−':'+'}${Math.abs(t.v)} ${t.id}</span>`;
@@ -123,7 +124,11 @@ function setHeader(){
   $('#mpbar').style.width = Math.max(0,S.mp/S.maxMp*100)+'%'; $('#mptxt').textContent = `${mpL()} ${S.mp} / ${S.maxMp}`;
   $('#xpbar').style.width = (S.lvl>=20?100:S.xp/G.xpNeed(S.lvl)*100)+'%'; $('#xptxt').textContent = `Lv ${S.lvl}  ·  XP ${S.lvl>=20?'MAX':S.xp+'/'+G.xpNeed(S.lvl)}`;
   const st = Object.keys(S.status).filter(k=>S.status[k]>0).map(k=>({poison:'☠',bless:'✨',curse:'💀'})[k]).join('');
-  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${C.n}</span><span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span><span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>${st?`<span class="chip">${st}</span>`:''}${S.insight>0?`<span class="chip" title="A sharp mind: one wrong answer is ruled out in the next question">💡 Insight <b>${S.insight}</b></span>`:''}`;
+  const ST = G.stories[S.story||'ashen'] || {};
+  const goldChip = ST.noGold ? '' : `<span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span>`;
+  const envChip = ST.hideEnv ? `<span class="chip">⏱️ Hour <b>${Math.floor(S.steps/2)+1}</b></span>` : `<span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>`;
+  const kidsChip = S.kids != null ? `<span class="chip" title="Children still with you">👧 Children <b>${S.kids}</b>/100</span>` : '';
+  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${String(C.n).replace(/^The /,'')}</span>${goldChip}${kidsChip}${envChip}${st?`<span class="chip">${st}</span>`:''}${S.insight>0?`<span class="chip" title="A sharp mind: one wrong answer is ruled out in the next question">💡 Insight <b>${S.insight}</b></span>`:''}`;
 }
 function renderRight(){
   const R = $('#rbody'); if (!R) return;

@@ -327,6 +327,7 @@ function atom(S, parts){
     case 'wx': return S.wx === v;
     case 'status': return (S.status[v]||0) > 0;
     case 'insight': return (S.insight||0) > 0;
+    case 'kids': return (S.kids == null ? 0 : S.kids) >= +v;
     case 'cp': return !!S.cp;
     case 'stat': return S.stats[v] >= +parts[2];
     case 'sv': return !!S.sv[v];
@@ -346,6 +347,7 @@ function why(neg, parts){
     case 'flag': return G.deeds[v] ? 'Needs deed: ' + G.deeds[v] : 'Needs a past deed';
     case 'ally': return 'Needs ' + (G.allies[v]?G.allies[v].n:v) + ' beside you';
     case 'anyally': return 'Needs a companion';
+    case 'kids': return 'Needs ' + v + ' children with you';
     case 'bond': return 'Needs a stronger bond with ' + (G.allies[v]?G.allies[v].n:v);
     case 'gold': return G.curStory==='changi' ? 'Needs $' + v : 'Needs ' + v + ' gold';
     case 'mp': return 'Needs ' + v + ' ' + mpName();
@@ -389,6 +391,7 @@ G.newState = function(cfg){
   (O.flags||[]).forEach(f => S.flags[f]=true);
   S.flags['origin_'+cfg.origin] = true;
   S.dmgMul = ({story:0.6, normal:1, grim:1.35})[cfg.diff||'normal']; S.diff = cfg.diff||'normal';
+  if ((G.stories[S.story]||{}).kids) S.kids = 100;
   G.curStory = S.story; S.chi = 0; S.queue = [];
   G.nextBeat(S);
   return S;
@@ -601,6 +604,7 @@ function applyFx(S, fx, R, o){
       if (rnd(S) < 0.5){ const pen = ['hp-2','mp-3', S.story==='ashen' ? 'gold-s' : 'gold-3'][Math.floor(rnd(S)*3)]; applyFx(S, pen, R, o); R.text += ' That slip cost you.'; }
       else R.text += ' No harm done, this time.';
     }
+    else if ((m = /^kids([+-])(\d+)$/.exec(tok))){ const cur = S.kids == null ? 100 : S.kids; const nv = Math.max(0, Math.min(100, cur + (m[1]==='-' ? -1 : 1) * (+m[2]))); if (nv !== cur){ S.kids = nv; R.tags.push({k:'kids', v:nv-cur}); } }
     else throw new Error('unknown fx token: '+tok);
   }
 }
@@ -844,7 +848,7 @@ G.perkDef = function(S){
   if (s2) opts.push({ t:`Study a new skill: ${G.skills[s2].icon} ${G.skills[s2].n}`, y:[`It takes weeks of stubborn practice, but you learn ${G.skills[s2].n}. ${G.skills[s2].d}`, `skill:${s2}`] });
   opts.push({ t:'Rest on your laurels: +6 max HP and +3 max MP', y:['You eat well, sleep deeply, and feel your reserves swell.', 'maxhp+6 maxmp+3'] });
   const kid = S.story==='changi';
-  return { id:'perk', art:(kid?'park|⭐':'camp|⭐'), title:`Level ${S.lvl}: Growth`, text: kid ? `You feel a little braver, a little wiser, a little taller. You are now level ${S.lvl}. What would you like to get better at?` : `You have grown stronger. Something in you has settled into a new shape — you are now level ${S.lvl}. A moment of quiet lets you decide who you are becoming.`, opts, noWx:true };
+  return { id:'perk', art:((G.stories[S.story]||{}).perkArt || (kid?'park|⭐':'camp|⭐')), title:`Level ${S.lvl}: Growth`, text: kid ? `You feel a little braver, a little wiser, a little taller. You are now level ${S.lvl}. What would you like to get better at?` : `You have grown stronger. Something in you has settled into a new shape — you are now level ${S.lvl}. A moment of quiet lets you decide who you are becoming.`, opts, noWx:true };
 };
 
 /* ---------------- BATTLE ---------------- */
@@ -1636,6 +1640,56 @@ G.addBiome('gorgon', x => skyDef(x)+sunmoon(x)+sea(x,210,'#1f5a78')+
   `<path d="M120 ${H} Q200 230 330 220 Q430 150 520 200 Q650 190 760 240 Q840 270 880 ${H}Z" fill="${x.c('#5a5648')}"/>`+
   Array.from({length:7},(_,i)=>{ const px=210+i*80+x.R(-10,10), py=250+((i%3)*20); return `<g fill="${x.c('#b4b0a4')}"><circle cx="${f(px)}" cy="${f(py-46)}" r="10"/><rect x="${f(px-9)}" y="${f(py-36)}" width="18" height="36" rx="6"/><rect x="${f(px-16)}" y="${f(py-30)}" width="8" height="${f(x.R(14,30))}"/></g>`; }).join('')+
   glow(520,200,160,'#58e08a',.28)+grass(x,'#3f7a36',10));
+})();
+
+</script>
+<script>
+/* Scene art for "Stolen Sky": the cell, corridors, the habitat ring, the lab, the engine room, the hangar, the bridge, a window on Earth, and the vents */
+(function(){
+const G = globalThis.G, K = G.artKit, W = K.W, H = K.H, f = K.f, glow = K.glow;
+const stars = (x, n) => Array.from({length:n}, () => `<circle cx="${f(x.R(0,W))}" cy="${f(x.R(0,H))}" r="${f(x.R(.4,1.6))}" fill="#fff" opacity="${f(x.R(.3,.95))}"/>`).join('');
+const panel = (c1, c2) => `<defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#pg)"/>`;
+
+G.addBiome('cellblock', x => panel('#0b1a22','#12303a')+glow(480,120,360,'#4fe0ff',.28)+
+  `<rect x="140" y="60" width="680" height="250" fill="#0e2630" stroke="#2a5a6a" stroke-width="6"/>`+
+  Array.from({length:14},(_,i)=>`<rect x="${160+i*47}" y="60" width="8" height="250" fill="#8fe8ff" opacity=".55"/>`).join('')+
+  `<rect x="140" y="300" width="680" height="14" fill="#1c4452"/><rect x="0" y="310" width="${W}" height="50" fill="#0a161c"/>`+
+  Array.from({length:5},(_,i)=>`<rect x="${210+i*120}" y="${250+(i%2)*10}" width="64" height="40" rx="8" fill="#23505f"/>`).join('')+
+  `<circle cx="480" cy="40" r="14" fill="#bff6ff" opacity=".85"/>`, true);
+G.addBiome('corridor', x => panel('#0a1219','#16242f')+
+  `<path d="M0 0 L330 120 L330 250 L0 360Z" fill="#101c26"/><path d="M${W} 0 L630 120 L630 250 L${W} 360Z" fill="#101c26"/><rect x="330" y="120" width="300" height="130" fill="#050a0f"/>`+
+  `<path d="M330 250 L630 250 L${W} 360 L0 360Z" fill="#1c2e3a"/><path d="M330 120 L630 120 L${W} 0 L0 0Z" fill="#14222c"/>`+
+  Array.from({length:6},(_,i)=>`<rect x="${340+i*50}" y="${126-i*2}" width="30" height="5" fill="#7ff0ff" opacity=".85"/>`).join('')+
+  glow(480,185,160,'#2ad8ff',.2)+`<path d="M60 300 L330 250 M900 300 L630 250" stroke="#3a6a7a" stroke-width="3" opacity=".6"/>`, true);
+G.addBiome('ring', x => `<rect width="${W}" height="${H}" fill="#07121a"/>`+stars(x,40)+
+  `<path d="M0 300 Q480 110 ${W} 300 L${W} ${H} L0 ${H}Z" fill="#2f6a3a"/><path d="M0 300 Q480 110 ${W} 300" stroke="#bff6ff" stroke-width="4" fill="none" opacity=".7"/>`+
+  Array.from({length:8},(_,i)=>{ const px=110+i*105, py=250-Math.sin((i/7)*Math.PI)*62; return `<ellipse cx="${px}" cy="${f(py-14)}" rx="${f(x.R(18,32))}" ry="${f(x.R(22,36))}" fill="#4fae5e"/><rect x="${px-3}" y="${f(py)}" width="6" height="22" fill="#4a3a28"/>`; }).join('')+
+  glow(480,120,300,'#fff5c8',.4)+`<rect x="0" y="0" width="${W}" height="38" fill="#0b1c26"/>`, true);
+G.addBiome('lab', x => panel('#0c1a14','#142a20')+glow(300,200,260,'#5dffb0',.3)+glow(680,200,240,'#7ff0ff',.22)+
+  Array.from({length:4},(_,i)=>`<rect x="${90+i*215}" y="100" width="110" height="190" rx="22" fill="#0d3a2c" stroke="#7dffc0" stroke-width="4" opacity=".92"/><ellipse cx="${145+i*215}" cy="${210+(i%2)*12}" rx="26" ry="40" fill="#8fffd0" opacity=".55"/>`).join('')+
+  `<rect x="0" y="296" width="${W}" height="64" fill="#0a1812"/><rect x="60" y="290" width="840" height="12" fill="#1f4a3a"/>`+
+  Array.from({length:18},()=>`<circle cx="${f(x.R(80,880))}" cy="${f(x.R(120,280))}" r="${f(x.R(1.5,4))}" fill="#c8ffe6" opacity=".7"/>`).join(''), true);
+G.addBiome('engineroom', x => panel('#1a0c08','#2a140c')+glow(480,200,380,'#ff7a2a',.5)+
+  `<rect x="360" y="40" width="240" height="260" rx="30" fill="#2a1410" stroke="#ff9a4a" stroke-width="6"/><rect x="400" y="80" width="160" height="180" rx="80" fill="#ff7a2a" opacity=".8"/><rect x="440" y="110" width="80" height="120" rx="40" fill="#ffe08a"/>`+
+  Array.from({length:6},(_,i)=>`<rect x="${40+i*50}" y="${80+(i%3)*30}" width="22" height="${200-(i%3)*30}" fill="#3a1e14"/><rect x="${660+i*44}" y="${70+(i%2)*40}" width="20" height="${210-(i%2)*40}" fill="#3a1e14"/>`).join('')+
+  `<rect y="300" width="${W}" height="60" fill="#160a06"/>`, true);
+G.addBiome('hangar', x => `<rect width="${W}" height="${H}" fill="#0a131c"/>`+glow(480,140,420,'#a8d8ff',.22)+
+  `<rect x="60" y="30" width="840" height="270" fill="#101e2c" stroke="#2a4a64" stroke-width="6"/><rect x="60" y="30" width="840" height="270" fill="none" stroke="#7fd0ff" stroke-width="2" stroke-dasharray="14 10" opacity=".5"/>`+
+  `<path d="M300 280 L360 190 L600 190 L660 280Z" fill="#c8d8e6"/><path d="M360 190 L420 130 L540 130 L600 190Z" fill="#a8bcd0"/><circle cx="480" cy="180" r="16" fill="#7fd0ff"/><rect x="330" y="280" width="300" height="14" fill="#6a8aa0"/>`+
+  `<rect y="300" width="${W}" height="60" fill="#0c1822"/>`+Array.from({length:6},(_,i)=>`<rect x="${100+i*140}" y="306" width="60" height="8" fill="#ffd24a" opacity=".6"/>`).join(''), true);
+G.addBiome('bridge', x => `<rect width="${W}" height="${H}" fill="#060a14"/>`+stars(x,80)+
+  `<path d="M0 360 L0 120 Q480 20 ${W} 120 L${W} 360Z" fill="#101a2a"/><path d="M80 300 L80 140 Q480 50 880 140 L880 300Z" fill="#050a18" stroke="#4fe0ff" stroke-width="3"/>`+
+  `<circle cx="640" cy="170" r="70" fill="#2a6ac0"/><ellipse cx="620" cy="160" rx="40" ry="14" fill="#5aa8ff" opacity=".6"/><circle cx="640" cy="170" r="70" fill="none" stroke="#8fd0ff" stroke-width="3" opacity=".5"/>`+
+  `<rect y="300" width="${W}" height="60" fill="#0c1424"/>`+Array.from({length:7},(_,i)=>`<rect x="${120+i*110}" y="${290-(i%2)*10}" width="70" height="26" rx="6" fill="#18304a" stroke="#4fe0ff" stroke-width="2"/>`).join(''), true);
+G.addBiome('earthview', x => `<rect width="${W}" height="${H}" fill="#02040c"/>`+stars(x,110)+
+  `<circle cx="330" cy="520" r="420" fill="#1a52a8"/><path d="M180 200 Q260 160 330 190 Q410 140 470 200" stroke="#4aa86a" stroke-width="34" fill="none" opacity=".85" stroke-linecap="round"/><path d="M260 250 Q310 230 360 260" stroke="#e8f4ff" stroke-width="16" fill="none" opacity=".7" stroke-linecap="round"/>`+
+  `<circle cx="330" cy="520" r="420" fill="none" stroke="#8fd8ff" stroke-width="6" opacity=".6"/>`+
+  `<rect x="0" y="0" width="${W}" height="${H}" fill="none" stroke="#1a2a3a" stroke-width="30"/><rect x="${W/2-4}" y="0" width="8" height="${H}" fill="#1a2a3a"/>`, true);
+G.addBiome('vent', x => `<rect width="${W}" height="${H}" fill="#06090d"/>`+
+  `<path d="M0 90 L${W} 90 M0 270 L${W} 270" stroke="#2a3a48" stroke-width="10"/><rect y="100" width="${W}" height="160" fill="#0c141c"/>`+
+  Array.from({length:12},(_,i)=>`<rect x="${i*84}" y="100" width="6" height="160" fill="#1c2c3a"/>`).join('')+
+  glow(900,180,160,'#7ff0ff',.45)+`<rect x="60" y="130" width="150" height="100" rx="10" fill="#0a1218" stroke="#3a5a6a" stroke-width="3"/>`+
+  Array.from({length:9},(_,i)=>`<path d="M${70+i*16} 140 L${70+i*16} 220" stroke="#2a4252" stroke-width="3"/>`).join(''), true);
 })();
 
 </script>
@@ -5292,6 +5346,282 @@ G.miniArch('gr_peril', PERIL);
 
 </script>
 <script>
+/* Data for "Stolen Sky": a child, a hundred other children, an alien ship, and a long way home. Science and nerve, no magic. */
+(function(){
+const G = globalThis.G, K = G.skill, I = G.item, D = G.deed;
+
+G.story('space',{ title:'Stolen Sky', icon:'🛸', art:'earthview|🛸 🌍', defName:'Sam', startRegion:'sp_cell', fixedTime:true, localWx:true, hideEnv:true, noGold:true, kids:true, labels:{ mp:'Nerve' }, target:100, xpScale:0.9, perkArt:'cellblock|⭐', fallbackArch:'sp_event',
+  tag:'Science fiction · escape from an alien ship · about 100 choices · a shorter adventure',
+  desc:'You were taken from your bedroom, and now you are locked in a cell aboard a vast alien ship with a hundred other children. The ship is leaving the solar system. Use what you know about history, geography, maths, machines and biology to get everyone out, and get everyone home. No magic. Just brains, nerve and a lot of very strange rooms.',
+  intro:'STOLEN SKY\nA science-fiction escape in about a hundred choices.\nYou remember a flash of white light over your bed, a hum that you could feel in your teeth, and then nothing. Now you are lying on a cold, ribbed floor under a ceiling that glows a soft, sick blue. There is a thick, clear wall in front of you with a window in it, and, through the window, there is the Earth. It is smaller than a football. It is getting smaller.\nAround you, a hundred other children are waking up, and every one of them is looking at you.\nThere is no magic here, and nobody is coming to save you. Everything you know, everything you have ever learned at school or from a book or by taking something apart, is about to matter. Choose with the number keys.',
+  deathLines:['The lights flicker, and then go out, and the hum of the great ship fades slowly into silence. Your journey ends here.','Everything goes white and quiet, and you think, very clearly, of your own front door. Your journey ends here.','The last thing you see is a small, blue-white Earth, far, far away. Your journey ends here.'],
+  create:{ nameArt:'cellblock|🧒', nameTitle:'Who are you?', nameText:'You are a twelve-year-old, awake in a locked cell in space. What is your name? (Type a name, then press Enter.)',
+    clsTitle:'What are you best at?', clsText:'{name}, you are going to need a lot of different kinds of brains. What do you know best? This shapes your strengths, your skills and the options you will see.', clsArt:'lab|📜 🧭 ➗ 🔧 🧬', originTitle:'Where is home?', originText:'Wherever it is, it is a very, very long way away. Where did you grow up?', originArt:'earthview|🌍',
+    sigText:'You already have a special strength', diffTitle:'How dangerous?', diffText:'A single bad decision can end your journey, or cost you some of the children. How forgiving should the ship be?',
+    diffs:[['story','Easy — forgiving','Much kinder. Great for enjoying the puzzles and the strangeness without worrying about dying.'],['normal','Normal — balanced','Careful thinking is rewarded. Careless choices are punished.'],['grim','Hard — unforgiving','Mistakes cost far more. Every child counts.']],
+    confirmText:'Your story begins on a cold floor, in a locked cell, on an alien ship, somewhere beyond the Moon.' } });
+
+/* ---------- skills: school subjects and real-world know-how ---------- */
+const KS=(id,n,icon,d,tags)=>{ K(id,n,icon,'skill',d,{story:'space'}); (tags||[]).forEach(t=>{ (G.TAGSK[t]=G.TAGSK[t]||[]).push(id); }); };
+KS('sp_history','History Buff','📜','You know how people solved hard problems before. +2 to lore and persuading.',['lore','persuade']);
+KS('sp_geo','Geography & Stars','🧭','You can read a map, a coastline or a constellation. +2 to lore and finding your way.',['survive','lore']);
+KS('sp_math','Mathematician','➗','Numbers, patterns and proofs. +2 to lore and crafting.',['lore','craft']);
+KS('sp_mech','Mechanic','🔧','You can take nearly anything apart and put it back better. +2 to crafting.',['craft']);
+KS('sp_bio','Biologist','🧬','You understand living things: how they grow, breathe and fail. +2 to healing and lore.',['heal','lore']);
+KS('sp_physics','Physics','⚛️','Forces, energy, circuits and orbits. +2 to crafting and lore.',['craft','lore']);
+KS('sp_chem','Chemistry','🧪','Acids, bases, gases and what happens when you mix them. +2 to crafting and surviving.',['craft','survive']);
+KS('sp_code','Logic & Code','💻','Patterns, programs and puzzles. +2 to crafting and lore.',['craft','lore']);
+KS('sp_lang','Languages','🗣️','You can learn to make sense of how others speak. +2 to persuading and lore.',['persuade','lore']);
+KS('sp_aid','First Aid','🩹','Calm hands and a clear head. +2 to healing.',['heal']);
+KS('sp_calm','Steady Nerves','🧘','You keep your head when things go badly wrong. +2 to resisting fear and enduring.',['resist','endure']);
+KS('sp_stealth','Quiet Steps','🤫','Soft-footed and observant. +2 to sneaking.',['sneak']);
+KS('sp_athlete','Athlete','🏃','Fit, quick and tough. +2 to climbing, dodging and enduring.',['climb','dodge','endure']);
+
+/* ---------- what you are good at ---------- */
+const KC=(id,x)=>{ G.classes[id]=Object.assign({ story:'space', hpl:3, mpl:2, learn:[] },x); };
+KC('sp_historian',{ n:'The History Nerd', icon:'📜', d:'You love how people solved problems in the past, from navigating by stars to sending secret messages.', hp:21, mp:9, stats:[8,10,10,15,13,12], sig:'sp_history', picks:['sp_lang','sp_geo','sp_calm','sp_code','sp_aid','sp_stealth'], pri:['INT','WIS','CHA'], learn:['sp_lang','sp_geo','sp_calm','sp_code','sp_aid','sp_stealth','sp_chem'], mentor:'your history teacher', kit:['sp_notebook','sp_ration'] });
+KC('sp_navigator',{ n:'The Map Kid', icon:'🧭', d:'You collect maps and star charts. Geography is not just names on a page; it is how the world fits together.', hp:23, mp:8, stats:[9,12,11,13,14,10], sig:'sp_geo', picks:['sp_math','sp_history','sp_athlete','sp_calm','sp_stealth','sp_physics'], pri:['WIS','INT','DEX'], learn:['sp_math','sp_history','sp_athlete','sp_calm','sp_stealth','sp_physics','sp_aid'], mentor:'your geography teacher', kit:['sp_watch','sp_water'] });
+KC('sp_mathlete',{ n:'The Maths Whiz', icon:'➗', d:'You see patterns everywhere. Primes, ratios and orbits are your favourite kind of puzzle.', hp:20, mp:10, stats:[7,11,10,16,12,10], sig:'sp_math', picks:['sp_code','sp_physics','sp_geo','sp_calm','sp_chem','sp_lang'], pri:['INT','WIS','DEX'], learn:['sp_code','sp_physics','sp_geo','sp_calm','sp_chem','sp_lang','sp_mech'], mentor:'your maths teacher', kit:['sp_notebook','sp_sweet'] });
+KC('sp_tinkerer',{ n:'The Fixer', icon:'🔧', d:'You take things apart to see how they work, and usually, you can put them back together.', hp:25, mp:7, hpl:4, stats:[11,14,12,13,10,9], sig:'sp_mech', picks:['sp_physics','sp_code','sp_athlete','sp_stealth','sp_chem','sp_aid'], pri:['DEX','INT','CON'], learn:['sp_physics','sp_code','sp_athlete','sp_stealth','sp_chem','sp_aid','sp_calm'], mentor:'your uncle, who owns a garage', kit:['sp_multitool','sp_water'] });
+KC('sp_biologist',{ n:'The Young Scientist', icon:'🧬', d:'Cells, germs, plants and animals fascinate you. You understand how the body works, and how it breaks.', hp:22, mp:9, stats:[8,11,12,14,14,11], sig:'sp_bio', picks:['sp_aid','sp_chem','sp_calm','sp_geo','sp_lang','sp_code'], pri:['INT','WIS','CON'], learn:['sp_aid','sp_chem','sp_calm','sp_geo','sp_lang','sp_code','sp_history'], mentor:'your science teacher', kit:['sp_water','sp_gel'] });
+
+const KO=(id,x)=>{ G.origins[id]=Object.assign({ story:'space', guardian:'your parents', gold:0 },x); };
+KO('sp_city',{ n:'A big-city kid', icon:'🏙️', d:'Trains, crowds and constant noise. You are quick and street-smart. (+1 DEX, +1 WIS)', bonus:{DEX:1,WIS:1}, kit:['sp_sweet'] });
+KO('sp_farm',{ n:'A farm kid', icon:'🌾', d:'Early mornings, machines and animals. You are tough and handy. (+1 CON, +1 STR)', bonus:{CON:1,STR:1}, kit:['sp_ration'] });
+KO('sp_coast',{ n:'A fishing-town kid', icon:'⛵', d:'Tides, boats and weather. You know the sea. (+1 CON, +1 INT)', bonus:{CON:1,INT:1}, kit:['sp_water'] });
+KO('sp_hills',{ n:'A mountain-village kid', icon:'⛰️', d:'Thin air, steep paths and big skies. You see the stars properly. (+1 WIS, +1 CON)', bonus:{WIS:1,CON:1}, kit:['sp_flashlight'] });
+
+/* ---------- items: everything is real-world kit or ordinary alien tech ---------- */
+I('sp_ration','Nutrient Bar','🍫','cons','A chewy bar from the ship\'s food slots. Tastes like cardboard that has met a banana. Restores 6 HP.',{use:'hp+6',v:1});
+I('sp_water','Bottle of Water','💧','cons','Cool, clean water. Restores 4 HP.',{use:'hp+4',v:1});
+I('sp_gel','Medical Gel','🧴','cons','A tube of cool gel that closes small wounds. Restores 10 HP.',{use:'hp+10',v:2});
+I('sp_sweet','Boiled Sweet','🍬','cons','A little comfort from home. Restores 3 Nerve.',{use:'mp+3 hp+1',v:1});
+I('sp_antidote','Neutraliser Tablet','💊','cons','A chalky tablet that counteracts the ship\'s sleep gas. Cures poison and restores 3 HP.',{use:'cure hp+3',v:2});
+I('sp_notebook','Notebook & Pencil Stub','📓','trink','Good for sketching maps and recording clues. +1 to lore.',{b:{lore:1},v:2});
+I('sp_watch','Wind-Up Watch','⌚','trink','Ticks reliably, even here. Good for timing things. +1 to crafting.',{b:{craft:1},v:3});
+I('sp_multitool','Multi-Tool','🔧','trink','Pliers, screwdrivers, a tiny saw. +2 to crafting.',{b:{craft:2},v:6});
+I('sp_flashlight','Pocket Torch','🔦','trink','A small, reliable torch. +1 to surviving (finding your way).',{b:{survive:1},v:3});
+I('sp_translator','Salvaged Translator','📟','trink','A half-working alien device that turns clicks into rough words. +2 to persuading and +1 to lore.',{b:{persuade:2,lore:1},v:0});
+I('sp_foil','Thermal Blanket','🪙','trink','A foil blanket from the ship\'s stores. +1 to resisting and enduring.',{b:{resist:1,endure:1},v:0});
+I('sp_wire','Coil of Cable','🧵','trink','A coil of insulated cable from the ship\'s stores. +1 to crafting.',{b:{craft:1},v:0});
+I('sp_keyshard','Access Shard','🔑','relic','A flat crystal chip that opens the ship\'s doors. Warm to the touch.',{v:0,relic:true});
+I('sp_chart','Star Chart','🗺️','relic','A hand-drawn map of the stars around the ship, with the Sun marked in your own writing.',{v:0,relic:true});
+I('sp_coolant','Coolant Canister','🧊','relic','A cold canister of liquid coolant. Strictly for engines, definitely not for drinking.',{v:0,relic:true});
+I('sp_cellpack','Power Cell','🔋','relic','A dense alien battery, about the size of a loaf of bread. Humming faintly.',{v:0,relic:true});
+I('sp_sample','Culture Sample','🧫','relic','A sealed dish of fast-growing, harmless-looking, extremely useful bacteria.',{v:0,relic:true});
+I('sp_podcode','Launch Sequence','📝','relic','A page of numbers in your handwriting: the hangar\'s launch sequence.',{v:0,relic:true});
+const GM=(id,n,icon,d,g)=>I(id,n,icon,'gimmick',d,{g,v:2});
+GM('sp_yoyo','Plastic Yo-Yo','🪀','It is the most Earth thing on this ship. Aliens find it fascinating.',[['You do a trick. A watching alien tilts its head in what might be wonder.','xp+s mp+2'],['The string tangles. Even in space, yo-yos do that.','xp+s']]);
+GM('sp_badge','Sticker Badge','🏅','"I AM A GREAT READER." Awarded to you in Year 3.',[['You wear it proudly. Somehow it helps.','xp+s mp+2'],['It falls off. Nobody notices.','xp+s']]);
+GM('sp_rubber','Rubber Band','➰','Never underestimate a rubber band.',[['A neat twang, and a distraction at just the right moment.','xp+s mp+1'],['It snaps, and stings your thumb.','xp+s hp-1']]);
+
+/* ---------- companions ---------- */
+const KA=(id,x)=>{ G.allies[id]=Object.assign({ id, dmg:0, story:'space' }, x); };
+KA('sp_noor',{ n:'Noor Haddad', icon:'🧒', role:'Cell-mate · star-gazer', b:{survive:2,lore:1}, bio:'Eleven and fearless about everything except the dark. She keeps a notebook of every constellation she has ever seen.', person:true });
+KA('sp_tomas',{ n:'Tomás Rivera', icon:'👦', role:'Older kid · mechanic', b:{craft:3,endure:1}, bio:'Fifteen, quiet, and always fiddling with something. He can fix a bicycle, a tractor or, he suspects, a spaceship.', person:true });
+KA('sp_lin',{ n:'Lin Mei', icon:'👧', role:'Cell-mate · budding scientist', b:{heal:2,lore:2}, bio:'Eleven, brilliant and brave. She wants to be a doctor, and already thinks like one.', person:true });
+KA('sp_oko',{ n:'Oko', icon:'🐙', role:'Alien archivist · a prisoner too', b:{lore:3,persuade:1}, bio:'A soft-bodied, many-armed creature of the Vell who studies the ship\'s records and quietly disagrees with its captors. It speaks in colour-patterns and soft clicks.', person:true });
+Object.keys(G.allies).forEach(a=>{ if(a.startsWith('sp_')) G.talks[a]=[]; });
+
+/* ---------- deeds ---------- */
+D('sp_out_cell','You got out of the cell.'); D('sp_has_key','You have an alien access shard.'); D('sp_knows_vell','You know the Vell are not all the same.'); D('sp_oko_friend','Oko, the alien archivist, is on your side.');
+D('sp_knows_orbit','You worked out where the ship is.'); D('sp_has_chart','You drew a chart of the stars.'); D('sp_garden_ok','You crossed the biodome without harm.'); D('sp_lab_ok','You found the antidote in the lab.');
+D('sp_shuttle_ok','You made the shuttle flyable.'); D('sp_launched','You launched the shuttle.'); D('sp_smart','You kept your head under pressure.'); D('sp_kind','You looked after the younger children.');
+D('sp_cell_clear','You counted all the children.'); D('sp_pod_fixed','You repaired a control panel.'); D('sp_oko_betrayed','You failed Oko.'); D('sp_warden_down','You disabled a warden drone.');
+
+/* ---------- regions ---------- */
+const R=(id,x)=>{ G.regions[id]=Object.assign({ id, story:'space', biomes:['corridor'], wx:{clear:1}, enc:{}, terrain:[], beasts:[], foes:[], hazards:[], elites:[] },x); };
+const E=(e,q,h,k)=>({ sp_event:e, sp_quiz:q, sp_hazard:h, sp_kids:k });
+R('sp_cell',{ n:'The Cell', kinds:['sp_cell'], biomes:['cellblock'], enc:E(2,3,0,3) });
+R('sp_corridor',{ n:'The Corridors', kinds:['sp_corridor'], biomes:['corridor','vent'], enc:E(4,3,3,2) });
+R('sp_ring',{ n:'The Habitat Ring', kinds:['sp_ring'], biomes:['ring','corridor'], enc:E(4,3,3,2) });
+R('sp_lab',{ n:'The Laboratories', kinds:['sp_lab'], biomes:['lab','vent'], enc:E(3,4,3,2) });
+R('sp_engine',{ n:'The Engine Decks', kinds:['sp_engine'], biomes:['engineroom','vent','corridor'], enc:E(3,3,4,2) });
+R('sp_hangar',{ n:'The Hangar', kinds:['sp_hangar'], biomes:['hangar','bridge'], enc:E(3,3,3,3) });
+R('sp_descent',{ n:'The Way Down', kinds:['sp_descent'], biomes:['earthview','hangar'], enc:E(2,4,3,2) });
+})();
+
+</script>
+<script>
+/* Random encounters for "Stolen Sky": knowledge questions, bizarre events, hazards and children who need help. */
+(function(){
+const G = globalThis.G;
+const RK = (p, msg, fx) => [p, msg, fx];
+const o = (t, y, fx, req, risk) => [t,'',y,fx||'xp+s','','',req||'',0,risk];
+const c = (t, chk, y, fx, n, nfx, req, risk) => [t,chk,y,fx||'xp+m',n||'It does not work out.',nfx||'xp+s',req||'',0,risk];
+const dare = (t, mp, y, fx, req) => [t,'',y,fx||'xp+l','','',req||'',mp];
+const L = (reg, title, em, text, ...opts) => [reg, title, em, text, opts];
+
+/* ================= KNOWLEDGE ================= */
+// [question, right, wrong1, wrong2, fact]
+const Q = [
+['Before satellites, sailors found their latitude at sea with which instrument?','A sextant','A barometer','A pendulum','A sextant measures the angle between the horizon and the Sun or a star.'],
+['Which code sends messages as short and long signals, dots and dashes?','Morse code','Braille','Binary stripes','Morse code let people send messages across oceans by telegraph.'],
+['Which Apollo mission put the first humans on the Moon, in 1969?','Apollo 11','Apollo 13','Apollo 8','Neil Armstrong and Buzz Aldrin walked on the Moon in July 1969.'],
+['Who made the first powered, controlled aeroplane flights in 1903?','The Wright brothers','Louis Blériot','The Montgolfier brothers','Orville and Wilbur Wright flew at Kitty Hawk, North Carolina.'],
+['Which ancient Greek device tracked the Sun, Moon and stars with gears?','The Antikythera mechanism','The Rosetta Stone','The Piri Reis map','Found in a shipwreck in 1901, it is sometimes called the first analogue computer.'],
+['Who became the first person to orbit the Earth, in 1961?','Yuri Gagarin','Neil Armstrong','Alan Shepard','Gagarin circled the Earth once in Vostok 1.'],
+['Which is the largest ocean on Earth?','The Pacific','The Atlantic','The Indian','The Pacific covers about a third of the whole planet.'],
+['Which imaginary line circles the Earth halfway between the North and South Poles?','The equator','The prime meridian','The Tropic of Cancer','The equator is at zero degrees latitude.'],
+['Which continent is almost entirely covered in ice?','Antarctica','Greenland','Australia','Antarctica holds about 70 percent of the world\'s fresh water, as ice.'],
+['Roughly how much of the Earth\'s surface is covered by water?','About 70 percent','About 30 percent','About 50 percent','That is why the Earth looks so blue from space.'],
+['From orbit at night, what shows up brightest on Earth?','Big cities','Deserts','Oceans','City lights make bright, glittering webs on the dark side of the planet.'],
+['In which direction does the Sun rise?','East','West','North','The Earth spins from west to east, so the Sun appears to rise in the east.'],
+['What is the next prime number after 7?','11','9','13','Primes have exactly two factors. 9 is 3 times 3, so it is not prime.'],
+['What comes next: 2, 4, 8, 16, ...?','32','24','30','Each number doubles the one before it.'],
+['A shuttle flies steadily 300 km in 10 minutes. How far does it go in 30 minutes?','900 km','600 km','3,000 km','Thirty minutes is three tens, so 3 times 300 is 900.'],
+['What do the angles of any triangle add up to?','180 degrees','360 degrees','90 degrees','Tear off the corners of any paper triangle and they line up into a straight line.'],
+['What is binary 101 in ordinary numbers?','5','3','10','1 times 4, plus 0 times 2, plus 1 times 1 makes 5.'],
+['Plants take in which gas from the air to make their food?','Carbon dioxide','Oxygen','Helium','Photosynthesis turns carbon dioxide and water into sugar and oxygen.'],
+['What do antibiotics treat?','Bacterial infections','Viruses','Broken bones','Antibiotics do nothing against viruses such as colds and flu.'],
+['What carries oxygen around your blood?','Red blood cells','White blood cells','Platelets','Red blood cells contain haemoglobin, which grabs oxygen in your lungs.'],
+['Which molecule carries the genetic instructions of living things?','DNA','ATP','Glucose','DNA is a long, twisted ladder of four chemical letters.'],
+['Making yoghurt, insulin or biofuel with microbes is an example of what?','Biotechnology','Astronomy','Geology','Biotechnology uses living things, such as bacteria and yeast, to make useful products.'],
+['What gives you "weight" on the inside of a spinning space habitat?','The spin of the ring','The ship\'s magnetism','The engines pushing down','The spin flings you outward against the floor, which feels just like gravity.'],
+['What does a fuse do?','It breaks the circuit if too much current flows','It stores electricity','It makes current stronger','A fuse sacrifices itself so that the equipment is not damaged.'],
+['Which gas makes up most of Earth\'s air?','Nitrogen','Oxygen','Carbon dioxide','Air is about 78 percent nitrogen and 21 percent oxygen.'],
+['Without air, how fast does a feather fall compared with a hammer?','The same speed','The hammer falls faster','The feather floats up','An astronaut proved this on the Moon during Apollo 15.'],
+['Which of these materials conducts electricity best?','Copper','Rubber','Glass','Copper wire is used almost everywhere that electricity has to travel.'],
+['Ohm\'s law links voltage to which two things?','Current and resistance','Mass and speed','Heat and light','Voltage equals current times resistance.'],
+['About how long does the Moon take to orbit the Earth?','About 27 days','About 7 days','About 365 days','The Moon\'s orbit gives us the cycle of months.'],
+['Which planet is called the Red Planet?','Mars','Venus','Jupiter','Iron oxide, rust, in Mars\'s soil gives it its red colour.']
+];
+const FR = [['A small, frightened girl tugs your sleeve. "Please ask me a question," she whispers. "It stops me thinking about everything else." You nod, and give her one.','🧒'],
+ ['A boy sitting against the wall says: "Quiz me. Anything. I need my brain to stay busy."','🧒'],
+ ['You find a scribbled note taped to a bulkhead: "Whoever reads this: do you remember this? Please say yes."','📝'],
+ ['In the gloom, two children are arguing in whispers. "Settle it," one says to you. "Ask the smart one. Is it true that..."','💬'],
+ ['A teenager, pale and exhausted, tries to lighten the mood. "Pop quiz time," she says, with a wobbly smile.','🧑'],
+ ['A tired voice from the dark says, almost to itself: "What was it again, the answer to that one from class...?"','💭'],
+ ['Someone scratches a question on the wall with a fingernail, and waits.','✏️']];
+const quiz = Q.map((q,i)=>{ const [qq,right,w1,w2,fact]=q; const fr=FR[i%FR.length]; const rot=i%3; const arr=[[right,true],[w1,false],[w2,false]]; const ord=[0,1,2].map(k=>arr[(k+rot)%3]);
+  const opts = ord.map(([t,ok])=> ok ? o(t, `Correct! ${fact}`, 'xp+m mp+1 quiz+') : o(t, `Not quite. The answer is "${right}". ${fact}`, 'xp+s quiz-'));
+  return ['any','A Question to Keep the Mind Busy',fr[1],`${fr[0]} "${qq}"`, opts]; });
+G.miniArch('sp_quiz', quiz);
+
+/* ================= BIZARRE EVENTS ================= */
+G.miniArch('sp_event', [
+L('any','The Floor Becomes the Wall','🌀',`There is a low groan, a shudder, and then the floor of the corridor seems to tilt. The ship is changing its spin, and for a dizzy ten seconds, the direction of "down" slides sideways. Cups, shoes and a lost sock begin to roll along the floor toward the right-hand wall. The younger children scream.`,
+ c('Grab the rail and haul the nearest children to it.','STR 8 endure',`You snatch two small hands and wrap your arm round the rail. The floor tilts and tilts, and then, with a thump, the world settles. Every child is still with you.`,'xp+l mp+2 flag:sp_kind','You hold on, but you lose your grip on one of the smallest. She is found a few minutes later, bruised and furious, but she is safe.','xp+m hp-2'),
+ o('Shout: "Everyone, lie flat and spread your arms!"',`Nobody argues. The children flatten themselves to the floor, and the shift passes over them like a wave. A few bruises, a lot of nervous giggles.`,'xp+m mp+2 flag:sp_smart'),
+ o('Hold on to the nearest pipe and wait.',`It lurches and groans for ten long seconds. Then it is over, and you are very glad of that pipe.`,'xp+s hp-1')),
+L('any','The Singing Wall','🎶',`The wall begins to hum. It is a low, pure tone, then another, and then a rhythm: two taps, three taps, five taps, seven taps, eleven taps. A strip of light pulses in time with it. Then it waits.`,
+ o('Tap the wall thirteen times.',`The strip of light brightens. The next panel in the wall slides open with a sigh, revealing a small recess with a power cell, and a little puff of warm air. The wall seems, impossibly, pleased.`,'xp+l +sp_cellpack mp+3 flag:sp_smart','skill:sp_math|skill:sp_code'),
+ c('Work out the pattern, then reply to it.','INT 9 lore',`Primes! Two, three, five, seven, eleven. You tap thirteen, and the wall sings a happy chord. A panel opens, and inside you find a small, warm power cell.`,'xp+l +sp_cellpack mp+3 flag:sp_smart','You cannot see the pattern. The wall waits, then loses interest.','xp+s'),
+ o('Tap along randomly.',`The wall emits a rude buzz and gives up on you.`,'xp+s mp-1'),
+ o('Leave it alone and walk on.',`The humming follows you down the corridor, and then fades.`,'xp+s')),
+L('any','The Water Sphere','💧',`In a round, white room with no floor lights, a huge sphere of water floats in the middle of the air, wobbling gently, as big as a car. Small silver fish dart around inside it. A group of children are staring up at it in awe, and one is reaching out a hand.`,
+ o('Pull the child back, and explain surface tension.',`"It holds together because the water molecules stick to each other," you say. "If you touch it, it will wrap round your hand, and then your face." She snatches her hand back, and her eyes grow very wide.`,'xp+m mp+2 flag:sp_kind'),
+ o('Touch it, very gently, with one finger.',`The sphere ripples and clings to your fingertip, cool and trembling. Beautiful, and entirely harmless.`,'xp+s mp+2','',RK(25,'The sphere lunges, wraps your whole hand, and a long bubble climbs your arm. You pull free, coughing, with a soaked sleeve and a very wet fringe.','hp-2 mp-2')),
+ c('Catch a fish in your cupped hands.','DEX 8 dodge',`You scoop one up, and it flicks free in a bright silver flash. A little girl laughs for the first time in two days.`,'xp+m mp+3 flag:sp_kind','The fish slides away and the water slaps your face. Everyone giggles.','xp+s hp-1')),
+L('any','The Food Slot','🍲',`A hatch in the wall opens, and a tray slides out: a bowl of translucent green jelly, a cup of something pink and bubbling, and four grey cubes that smell faintly of oranges. Hungry children crowd round.`,
+ o('Test a tiny taste yourself first.',`The jelly is bland, the cubes are chewy, and the pink liquid tastes like strawberries that have been to the dentist. Nothing happens. You nod, and let the others eat.`,'xp+m hp+4 flag:sp_kind','',RK(20,'An hour later, you are dizzy and your skin tingles. The pink drink was not meant for humans. A few of the other children, who followed your lead, are miserable too.','hp-3 mp-3')),
+ c('Study the food and check what is in it.','INT 9 lore',`The jelly is mostly algae and sugar, perfectly safe. The pink liquid is not: it is a mild sedative. You pour it away, and the children eat the rest.`,'xp+l hp+4 mp+2 flag:sp_smart','Everything looks the same to you. You guess, and let the children eat only the jelly.','xp+s hp+2'),
+ o('Tell everyone to eat nothing.',`It is the cautious choice. It is also a long, hungry few hours.`,'xp+s mp-1')),
+L('any','The Hall of Mirrors','🪞',`A long hall is lined with polished metal on both sides, and an endless line of children, hundreds of you, stretches off into the distance in either direction. A single doorway, somewhere, leads out. You cannot tell which of the reflections is real.`,
+ c('Touch the wall, and follow it with your hand.','WIS 8 survive',`You keep one hand on the left wall and walk. Reflections never fool a hand. A hundred steps later, you find the doorway, and every child streams through.`,'xp+l mp+2','The wall curves in ways you did not expect. You walk in a very big circle before you find the door.','xp+s mp-2'),
+ o('Throw a shoe at the nearest reflection.',`Clang. The shoe bounces off a mirror, and you know which wall is real. You find the door a moment later, minus one shoe.`,'xp+m mp+1'),
+ o('Close your eyes and walk straight ahead.',`You walk into a mirror, and a lot of identical children wince at once.`,'xp+s hp-2')),
+L('any','A Window Full of Stars','🌌',`A long, curved window opens on to the dark. Thousands of unblinking stars hang in it, brighter than you have ever seen them, and in the corner, very small and very blue, the Earth. A few children are pressed against the glass in silence. One of them is crying.`,
+ c('Try to name the constellations you can see.','WIS 9 survive',`Orion, the Hunter, with his three-star belt; the Pleiades like a tiny dipper. You point them out one by one, and the children, one by one, stop crying. For the first time, the stars feel like old friends.`,'xp+l mp+4 flag:sp_kind','You are not sure which stars are which, but your voice is calm, and it helps.','xp+m mp+2','skill:sp_geo'),
+ o('Sit next to the crying child and say nothing.',`You sit, and she leans against your shoulder. Eventually, she stops crying. Eventually, you both stop being afraid.`,'xp+m mp+3 flag:sp_kind'),
+ o('Use the view to work out where the ship is heading.',`The Earth is moving to the left, and growing smaller. The ship is heading directly away from the Sun. You write the numbers on your hand. Time is running out.`,'xp+m mp-1 flag:sp_knows_orbit')),
+L('any','The Collection Hall','📦',`Row after row of glass cases stretch away into the dark, and in each one is something taken from Earth: a vinyl record, a bicycle, a bowl of fruit, a snow globe, a violin, a toy bear, a whale's skeleton in pieces. A card in an unknown script labels every one. In a corner, a little girl is staring at a case with a teddy bear in it. "That's mine," she whispers.`,
+ o('Look for a way to open the case.',`You find a small latch and click it. The teddy bear falls into her arms. She hugs it so hard, you think she might never let go. The aliens have collected more than children.`,'xp+m mp+3 flag:sp_kind'),
+ c('Read the records on the vinyl disc.','INT 8 lore',`A gold record, like one sent into space in 1977. A message from Earth to anyone listening. You realise the Vell found it, and followed it, all the way home. They are not invaders. They are visitors, who made a terrible mistake.`,'xp+l mp+2 flag:sp_knows_vell','You cannot read it, but you wonder what else the Vell have collected.','xp+s'),
+ o('Take the violin, just in case.',`It is useless as a weapon and heavy to carry, but you feel better with it.`,'xp+s mp+1 +sp_yoyo')),
+L('any','The Frozen Corridor','🧊',`The door hisses open on a corridor white with frost. Your breath hangs in the air, and the walls are glazed with ice. It is the shortest way across, and the cold bites through your clothes in seconds.`,
+ o('Wrap up in a thermal blanket and run for it.',`Foil, speed and stubbornness. You race through with your teeth chattering, and come out the other side with frozen eyelashes and a very big grin.`,'xp+m mp+2 -sp_foil','item:sp_foil'),
+ c('Move quickly, keeping close to the warm pipes.','CON 9 endure',`You hug the pipes, and run. Frost bites your ears and your fingers, but you reach the end with only a few tears and a lot of pride.`,'xp+m mp+2 hp-1','The cold is crueller than you expected. You stagger out, shivering and numb.','xp+s hp-3'),
+ o('Go back and find another way.',`The long way takes an hour, but there is no frost at all.`,'xp+s')),
+L('any','The Mimic Drone','🤖',`A small, round drone drifts out of a vent, chirping. It flashes a pattern of lights: red, blue, red, red. Then it waits. When you do not respond, it flashes it again, faster, and a thin red beam begins to sweep across the corridor.`,
+ c('Copy the pattern with your torch.','DEX 8 craft',`Red, blue, red, red. You flash it back. The drone chirps, turns green, and drifts away. It is only an alien greeting. A very polite alien greeting.`,'xp+l mp+2 flag:sp_smart','Your timing is wrong. The beam sweeps over you, and the drone makes a sharp, unhappy sound before it leaves.','xp+s mp-2','item:sp_flashlight'),
+ o('Duck behind a crate until it moves on.',`The drone hesitates, flashes once, and drifts off down the corridor, bored.`,'xp+s mp+1'),
+ o('Throw something to distract it.',`A shoe bounces down the corridor. The drone chases it. You and the children slip away.`,'xp+m mp+1')),
+L('any','The Garden of Sleeping Flowers','🌺',`A small side-room is full of tall, blue-and-gold flowers that glow softly in the dim light. They smell of honey and vanilla. A group of tired children have already settled down among them, eyes half-closed, smiling dreamily.`,
+ c('Pull the children out and open the door for fresh air.','STR 8 endure',`You haul them out one by one, and slam the door on the sweet-smelling room. The children yawn and rub their eyes. "That smelled nice," says one, groggily. You are very glad you came when you did.`,'xp+l mp+2 flag:sp_kind','You drag out most of them, but the smell is already working on you, and the rest of the room spins. Someone takes your hand and leads you out.','xp+m hp-2 mp-2 kids-3'),
+ o('Hold your breath and call them from the doorway.',`Half of them stir and stumble to you. The other half are fast asleep. You have no choice but to carry them out one by one, holding your breath until your lungs burn.`,'xp+m hp-1'),
+ o('Leave them to sleep; the flowers look harmless.',`They sleep for hours, and the whole group is delayed. When the wardens find the room, you lose some of them.`,'xp+s kids-6')),
+L('any','The Silent Hall','🔇',`The hall is huge and entirely silent. No hum, no hiss, no footsteps; your own breath makes no sound. A long line of alien lamps hangs from the ceiling, dark. In the middle of the floor, a very large machine is slowly spinning.`,
+ c('Cross quietly along the wall.','DEX 8 sneak',`You slip along the wall, one slow footstep at a time, and slide out through the far door. The machine never stops spinning.`,'xp+m mp+2','You knock a dark lamp, which wakes up with an unpleasant, sudden glare. The machine slows, and begins to turn toward you.','xp+s mp-2 hp-1','skill:sp_stealth'),
+ o('Walk straight across the middle.',`Nothing happens, nothing at all, which is somehow worse. Halfway across, a pale blue light sweeps over you, hesitates, and moves on.`,'xp+s mp-1','',RK(25,'The light finds a child at the back of the group, and a low alarm begins to whine. A drone sweeps in, and some of the children are separated before you can get away.','kids-5')),
+ o('Go back and find another route.',`There is always another route. It takes an hour, but it is quiet.`,'xp+s')),
+L('any','The Alien Lullaby','🎵',`Somewhere ahead, in the dark, someone, or something, is humming. It is a gentle, strange tune, in a scale you have never heard, and it makes your skin tingle. It does not sound like a threat. It sounds like a creature that is very, very homesick.`,
+ o('Hum back, very softly.',`The humming stops. Then it begins again, hesitantly, a little closer. A soft, many-armed shape glides out of the shadows, looks at you, and, tentatively, waves one tentacle.`,'xp+l mp+3 flag:sp_knows_vell'),
+ c('Walk toward it, hands visible.','WIS 8 resist',`You walk with your palms open. The creature watches you, shivering, and then, slowly, lowers its arms. It is as frightened of you as you are of it.`,'xp+l mp+2 flag:sp_knows_vell','The creature flinches and slides back into a vent. You hear it humming, far off, and you wish you had tried harder.','xp+s'),
+ o('Back away quietly.',`You do not know what it was. You are curious, and a little ashamed, for a long time afterwards.`,'xp+s'))
+]);
+
+/* ================= HAZARDS ================= */
+G.miniArch('sp_hazard', [
+L('any','Sleep Gas','💨',`A hiss from a ceiling vent, and a thin pale cloud begins to roll down the corridor. Already the children at the back are yawning, and one has slumped against the wall. It smells faintly of pears.`,
+ c('Pull everyone back and seal the door with a jacket.','INT 9 craft',`You stuff a rolled-up jacket into the gap under the door, and the gas stops at the threshold. Everybody coughs, but nobody falls asleep. You hold your breath, and count to a hundred.`,'xp+l mp+2 flag:sp_smart','You get most of them clear, but a few sleepers have to be carried, and the wardens find them first.','xp+m hp-2 kids-4','skill:sp_chem|skill:sp_bio|skill:sp_mech'),
+ o('Take the neutraliser tablet and share it.',`A chalky tablet, snapped into pieces and passed round. Everyone gags, but nobody sleeps.`,'-sp_antidote xp+m mp+2','item:sp_antidote'),
+ o('Run, and hold your breath.',`You run, and run, and run, until your lungs burn and the gas is far behind. It is not elegant, but it works.`,'xp+s hp-2 mp-1')),
+L('any','The Electric Floor','⚡',`The corridor floor ends in a bright metal grille, humming with a deep, steady buzz, and a warning pattern of blue sparks dances over it. The door to the next room is on the other side. Everyone is looking at you.`,
+ c('Cross on the rubber mats, one at a time.','INT 9 craft',`Rubber insulates. You lay out the rubber floor mats from the storage locker, and step across one by one, leading every child over the humming metal. Not one spark finds you.`,'xp+l mp+3 flag:sp_smart','You slip, and a tingling shock runs up your leg. You scramble clear, shaking, but the children are safe.','xp+m hp-3','skill:sp_physics|skill:sp_mech'),
+ o('Look for the power switch.',`Behind a panel, a cluster of cables and a big, obvious switch. You flip it. The humming dies. Every child cheers, quietly.`,'xp+m mp+2'),
+ o('Jump across it in one bound.',`You leap. The spark catches your heel, and your whole body judders.`,'xp+s hp-4')),
+L('any','The Pressure Door','🚪',`The door will not open. A readout glows beside it in alien numerals, climbing and falling: 6, 12, 24, 48, and then a blank. A drone is chirping angrily somewhere behind you. The door needs the next number.`,
+ o('Enter 96.',`Click. The door slides open with a sigh of relief. Each number is double the last: 6, 12, 24, 48, 96. A quick, clean victory.`,'xp+l mp+3 flag:sp_smart','skill:sp_math|skill:sp_code'),
+ c('Spot the pattern and enter the next number.','INT 8 lore',`Doubling! 6, 12, 24, 48 ... 96. You tap it in, and the door slides open.`,'xp+l mp+3 flag:sp_smart','The pattern eludes you. The drone arrives, and you have to run.','xp+s mp-2'),
+ o('Force the door with a bar.',`It groans, and it bends, and, with enormous effort, it lets you through. Everyone is exhausted, and the drone will have noticed.`,'xp+s hp-2 mp-2')),
+L('any','Falling Cargo','📦',`There is a groan from overhead, and a huge stack of crates in the cargo bay begins to lean. A shower of loose parts rattles down. A line of children is directly underneath.`,
+ c('Shout and shove everyone clear.','DEX 8 dodge',`You throw yourself at the line and push. The crates smash down where they had been standing, in a thunderous cloud of dust. Every child is safe.`,'xp+l mp+2 flag:sp_kind','You get most of them clear. A few are hit by flying parts, and have to be carried the rest of the way.','xp+m hp-2 kids-3'),
+ o('Order them to run, in a calm, loud voice.',`"Everybody run to the door, now!" You keep your voice level, and they obey. The crates thunder down behind you.`,'xp+m mp+2'),
+ o('Stand still and hope it holds.',`It does not hold.`,'xp+s hp-3 kids-4')),
+L('any','The Scanner Beam','🔦',`A red beam sweeps slowly across the corridor ahead, back and forth, back and forth, like a lazy lighthouse. Each sweep takes about six seconds. There is a doorway on the other side.`,
+ c('Time the beam, and go in the gap.','WIS 8 survive',`One, two, three, four, five, six. The beam passes. You count it three times, and then, in the quiet after the third sweep, you run, and the children follow in single file.`,'xp+l mp+2 flag:sp_smart','Your count is wrong by a second, and the beam catches the last child.','xp+m hp-1 kids-2','item:sp_watch|skill:sp_math'),
+ o('Crawl along the floor.',`The beam passes over your head. You crawl, the children crawl, and everyone makes it, covered in dust.`,'xp+s mp+1'),
+ o('Block the beam with a foil blanket.',`The beam cannot get through. You hold the blanket up, and the children file past underneath.`,'xp+m mp+2','item:sp_foil')),
+L('any','Coolant Leak','🌫️',`A pipe overhead has burst, spraying a thick white fog across the floor. It is freezing, slippery and dense enough to hide your own hands. Somewhere in the cloud, a child is calling out.`,
+ c('Find the shut-off valve, and close it.','INT 8 craft',`You feel along the pipe until your fingers find a wheel. You turn it, hard, and the fog thins. The child is sitting on the floor, shivering. You wrap her in your jacket.`,'xp+l mp+3 flag:sp_kind','You cannot find it in the fog. You grab the child and pull her out.','xp+m hp-2','skill:sp_mech|skill:sp_physics|item:sp_multitool'),
+ o('Follow the sound of the child.',`You stumble through the fog, calling, until you find her. You lead her out by the hand.`,'xp+m mp+2 hp-1'),
+ o('Wait for the fog to clear.',`It takes a long time, and the cold seeps into everyone's bones.`,'xp+s hp-2')),
+L('any','The Hot Pipe','🔥',`The only way past is a narrow gap beside a thick, shimmering pipe. A small plate on it reads, in a symbol you somehow understand: HOT. The metal is glowing dull orange.`,
+ o('Wrap your sleeve and squeeze past, with the children behind you.',`It takes a long, nervous minute, but you slip through without touching it. Everyone follows, one at a time.`,'xp+m mp+1','',RK(25,'Someone brushes the pipe, and there is a yelp. A burn, small but painful, and a very frightened child.','hp-2 mp-2')),
+ c('Wrap the pipe in a wet cloth and cool it first.','INT 8 craft',`Hiss. Steam rises. The pipe cools just enough, and you lead everybody through, with only a tiny burn on one finger.`,'xp+l mp+2','The cloth dries out in seconds. You squeeze past anyway.','xp+s hp-2','item:sp_water'),
+ o('Turn back and find a longer way.',`It adds twenty minutes, and nobody is burned.`,'xp+s'))
+]);
+
+/* ================= CHILDREN WHO NEED YOU ================= */
+G.miniArch('sp_kids', [
+L('any','A Frightened Little One','😢',`A boy of about six sits in the corner with his knees drawn up, rocking and shaking. He will not look up. Every few seconds he whispers one word: "Mama."`,
+ o('Sit beside him and tell him a story from home.',`You tell him about the mountain near your home, the dog next door and the best sandwich you ever had. By the end, his shaking has stopped, and his hand is in yours.`,'xp+m mp+3 flag:sp_kind'),
+ c('Work out what he needs.','WIS 8 heal',`He is hungry and cold. You give him your last nutrient bar and wrap him in your jacket. The colour returns to his face.`,'xp+l mp+3 flag:sp_kind','You are not sure, and just keep him company.','xp+m mp+1'),
+ o('Promise: "I will get you home."',`He looks up with enormous eyes. "Promise?" You swallow, and nod. You hope very much that you will be able to keep it.`,'xp+m mp-1 flag:sp_kind')),
+L('any','The Head Count','🔢',`You count the children for the third time and get a different number each time. Ninety-six. Ninety-eight. A hundred and one. If anyone is missing, you must find them before you move. And you cannot trust your count.`,
+ c('Count them in tens, using a chalk mark on every shoulder.','INT 8 lore',`Ten groups of ten, each marked with a pencil dot on the hand. This time, there are exactly one hundred children. Nobody is missing. You feel a huge, silent relief.`,'xp+l mp+3 flag:sp_cell_clear','The count still will not come out right. You decide to move on carefully, and watch each other.','xp+s','skill:sp_math|skill:sp_code'),
+ o('Ask the children to hold hands in pairs.',`Fifty pairs. Everyone is accounted for, and nobody can wander off. It is slow, but it works.`,'xp+m mp+2 flag:sp_kind'),
+ o('Move on and trust your count.',`You hurry on. Later, you realise a small boy was left behind in the last room.`,'xp+s kids-2')),
+L('any','Not Enough Food','🍫',`The food slot has given you a tray with twelve small bars. There are a hundred children, and none of them has eaten in a long time. Every eye in the room is on the tray.`,
+ c('Divide the food fairly, by size and need.','INT 8 lore',`You cut every bar into tiny pieces, and give the youngest children first. Nobody gets enough, but nobody gets nothing. A very practical sort of fairness.`,'xp+l mp+3 flag:sp_kind','The pieces are uneven, and there is a small argument. But everyone eats a little.','xp+m mp+1','skill:sp_math'),
+ o('Give it all to the youngest.',`The small ones eat, silent and solemn. The bigger ones watch, and some of them are angry.`,'xp+m mp+1 flag:sp_kind'),
+ o('Keep it for the leaders.',`The older kids eat. The little ones are hungry. You feel awful about it.`,'xp+s mp-2 kids-3')),
+L('any','A Sick Child','🌡️',`A girl lies shivering against the wall, flushed and clammy, with a rasping breath. The children around her are very quiet. She looks at you, and tries to smile.`,
+ c('Check her temperature, her breathing and her water.','WIS 9 heal',`A fever, and not a bad one. She is badly dehydrated. You get her sipping water, cool her forehead and keep her still. By the hour's end, she is sitting up.`,'xp+l mp+3 flag:sp_kind','You are not sure what is wrong, but you keep her warm and comforted.','xp+m mp+1','skill:sp_aid|skill:sp_bio'),
+ o('Give her a sip of water and a medical gel.',`The gel soothes her. She drifts into sleep, breathing easier.`,'-sp_gel xp+m mp+2 flag:sp_kind','item:sp_gel'),
+ o('Make her comfortable and carry on.',`You fold a blanket under her head, and promise to come back.`,'xp+s mp-1')),
+L('any','The Bossy Teenager','😠',`A tall boy has gathered a gang near the door. "I'm in charge," he says. "We do what I say." Some children are nodding. Others look scared. His plan, to break straight out through the main door, will get a lot of people caught.`,
+ c('Persuade him to listen to a better plan.','CHA 9 persuade',`You are calm, and you are specific. In a few minutes, he is nodding. "Alright," he says gruffly, "do it your way." The children relax.`,'xp+l mp+3 flag:sp_kind','He does not listen. You have to go around him, and some of his gang go with him.','xp+m kids-3','skill:sp_history|skill:sp_lang'),
+ o('Let him go first, and follow at a distance.',`He storms ahead, and alarms start to sound. You lead the others the other way, and lose some of his followers.`,'xp+s kids-3'),
+ o('Challenge him in front of everyone.',`It turns into a shouting match. In the end, a lot of the children have lost their nerve.`,'xp+s mp-3')),
+L('any','The Boy Who Will Not Speak','🤐',`A thin boy of about nine sits very still, watching you. He has not spoken to anyone. When you ask his name, he only shakes his head. But he keeps pointing at something drawn on the wall.`,
+ c('Look at what he has drawn.','INT 8 lore',`A map! He has been drawing the ship in careful, tiny lines: corridors, doors, the path to the hangar. He is the best prisoner you have ever met.`,'xp+l mp+3 flag:sp_kind +sp_chart','It is a fascinating drawing, but you cannot read it. You thank him, and he nods.','xp+m mp+2'),
+ o('Sit next to him and draw something yourself.',`You draw a sunrise. He adds a house. Eventually, you have a whole village, and he has said his first word: "Home."`,'xp+m mp+3 flag:sp_kind'),
+ o('Leave him be.',`Some people need quiet. You nod, and let him be.`,'xp+s')),
+L('any','A Child in the Vent','🕳️',`A thin, frightened voice is calling from inside a ventilation shaft just above your head. A very small girl has crawled in, and cannot back out. Her feet are sticking out of the grille.`,
+ c('Talk her through backing out.','CHA 8 persuade',`"Wriggle backwards. One knee, then the other." You keep your voice slow and kind. A minute later, she drops out of the vent, covered in dust, and hugs you.`,'xp+l mp+3 flag:sp_kind','She is too frightened to listen, and you have to pull her out by the ankles.','xp+m hp-1'),
+ c('Climb in after her.','DEX 9 climb',`The shaft is narrow, but you are narrower. You reach her, and turn her gently round, and together you crawl out.`,'xp+l mp+2 flag:sp_kind','You wedge yourself in. It takes five terrible minutes, and a lot of wriggling, to get out.','xp+m hp-2 mp-2'),
+ o('Fetch an older child to help.',`Tomás, or someone like him, is a better climber. It takes a few minutes longer, but it works.`,'xp+s')),
+L('any','Two Friends Quarrelling','😤',`Two girls in matching pyjamas are shouting at each other in the middle of the room. One has lost a stuffed toy and is sure the other took it. Everyone is watching. It is getting loud.`,
+ c('Find the toy.','WIS 8 survive',`It is stuck behind a ventilation panel. You pull it out and hand it back. Both girls fall into each other's arms, sobbing and laughing at once.`,'xp+l mp+3 flag:sp_kind','You cannot find it, but you calm them down enough to stop the shouting.','xp+m mp+1'),
+ o('Take them aside and listen to each, one at a time.',`It takes a while. By the end, both are crying, but they are friends again.`,'xp+m mp+2 flag:sp_kind'),
+ o('Tell them to be quiet, or the wardens will hear.',`They go quiet, scared. You feel a bit mean about it, but you do not hear any wardens.`,'xp+s mp-1'))
+]);
+})();
+
+</script>
+<script>
 /* THE LADY OF CASUARINA HOUSE — Chapters 1 & 2 (Tampines, then Changi Village) */
 (function(){
 const G = globalThis.G;
@@ -8426,6 +8756,371 @@ T('gr9_set',
 
 </script>
 <script>
+/* STOLEN SKY — Chapters 1-3: The Cell, The Corridors, The Habitat Ring */
+(function(){
+const G = globalThis.G, { S_, QS } = G.grh;
+
+/* ================= CHAPTER 1: THE CELL ================= */
+G.chapter('sp1',{ story:'space', n:'Chapter 1: The Cell', sub:'Somewhere beyond the Moon', ch:0, region:'sp_cell', art:'cellblock|🛸', age:12, btn:'Open your eyes',
+  text:`Cold. That is the first thing: a cold, ribbed floor under your cheek, and a faint, steady hum that you feel in your teeth.\nThe ceiling glows a soft, sick blue. In front of you stands a clear wall as thick as your arm, with a heavy door in it, and beyond the wall there is a window, and beyond the window there is nothing but stars.\nAnd in the corner of the window, very small and very blue, there is the Earth.\nAround you, a hundred children are waking up, and every one of them is looking at you.`,
+  beats:()=>G.mix(['sp1_wake','sp1_count','sp1_friends','sp1_cell','sp1_warden','sp1_plan','sp1_lock'],4,{nocamp:true}) });
+
+S_('sp1_wake','Waking in the Cell','cellblock|🛸 🌍',
+`You are lying on a floor that is not your bedroom floor. Your pyjamas are damp with cold sweat. Somewhere nearby, a small child is whimpering, and somewhere else, a bigger one is trying very hard not to.\nThrough the clear wall and the window beyond it, the stars do not twinkle. They simply hang there, hard and bright and enormous, and the Earth is the size of a football, and it is shrinking.\nYou remember a flash of white light over your bed. You remember a hum. You remember nothing after that.`,[
+ {t:`Go to the window and look at the Earth.`,y:[`You press your forehead against the cold glass. Blue oceans, white clouds, a smear of brown that must be Africa, or maybe Arabia. The sight is so beautiful that it hurts. It is also very, very far away.`,'xp+m mp-1 flag:sp_knows_orbit']},
+ {t:`Check that the children around you are all right.`,y:[`You kneel beside a boy who is shaking, and a girl who will not let go of her blanket. You tell each of them your name. It is an odd, small thing to do, and it helps more than you expected.`,'xp+m mp+2 flag:sp_kind']},
+ {t:`Search your pockets for anything useful.`,y:[`Pyjama pockets: a bit of lint, a crumpled tissue and, in the corner, a single boiled sweet, still in its wrapper. A little piece of home.`,'xp+s +sp_sweet']},
+ {t:`Shout for help as loudly as you can.`,y:[`Your voice booms and rattles off the walls. Nobody answers. Then, at the end of the corridor beyond the glass, a small round machine rotates slowly toward you, its single red lens glowing.`,'xp+s mp-2'],risk:[30,`The machine hums closer, chirps, and a pale beam sweeps over the cell. When it moves on, a few of the smallest children have been pulled away and taken somewhere, crying.`,'kids-3 hp-1']} ]);
+
+S_('sp1_count','A Hundred Faces','cellblock|🧒 🧒',
+`The cell is enormous, a long, curved hall with rows of bunks bolted to the wall and a sticky, faintly warm floor. Children of every age are sitting up now: toddlers, tall teenagers, a pair of twins with identical bed-hair. Some are crying. Some are silent. Some are staring at you, because you are the one who is standing up.\n"What do we do?" asks someone, in a very small voice. Then someone else says it. Then everyone is looking at you.`,[
+ {t:`Climb onto a bunk and ask for quiet.`,c:'CHA 8 persuade',y:[`"Listen," you say, in the calmest voice you own. "I do not know where we are. But I know this: we are not alone, and we are going to get home." The room goes still. Someone, somewhere, begins to nod.`,'xp+l mp+3 flag:sp_kind'],n:[`Your voice cracks, and some of the little ones start crying again. But a few of the older children hear you, and stand a little straighter.`,'xp+m mp-1']},
+ {t:`Divide everyone into groups of ten, each with a leader.`,c:'INT 8 lore',y:[`Ten groups, ten leaders, and a head-count that adds up to exactly one hundred. Order spreads through the room like warmth. Now, at least, nobody can be lost without somebody noticing.`,'xp+l mp+3 flag:sp_cell_clear'],n:[`The groups are messy, and the count keeps changing. But a few leaders do step up, and it is better than nothing.`,'xp+m mp+1']},
+ {t:`Ask everyone their name, and what they are good at.`,y:[`It takes half an hour. By the end, you know that there is a boy who can fix anything with a screwdriver, a girl who knows the names of every star and a pair of twins who never, ever stop talking. A hundred children, and every one of them knows something.`,'xp+m mp+2 flag:sp_kind']},
+ {t:`Say nothing, and watch what the others do.`,y:[`The older children take charge of the younger ones without being asked. It is quiet, careful and kind, and it tells you more than a speech would have.`,'xp+s mp+1']} ]);
+
+S_('sp1_friends','Three Who Step Forward','cellblock|🤝 🛸',
+`Three children make their way through the crowd. A tall boy of about fifteen, with oil-stained hands and a patient, careful face. A small, fierce girl with a notebook clutched in both arms. A third, with a long plait and steady eyes, who is quietly checking the little ones' foreheads, one by one.\n"We should work together," says the girl with the notebook. "I think you are the only one who has a plan."`,[
+ {t:`Ask the tall boy what he thinks of the door.`,y:[`"Tomás," he says, with a small, shy nod. "I fix tractors. This door is not a tractor, but it is a door." He glances at the panel, and, for the first time, you see him smile. "I will help."`,'xp+m mp+2 ally:sp_tomas']},
+ {t:`Ask the girl with the notebook about the stars outside.`,y:[`"Noor," she says. "I have been counting them since I woke up. We are going away from the Sun. The stars are not moving the way they should if we were near home." She taps her notebook. "I will help you work out where we are."`,'xp+m mp+2 ally:sp_noor flag:sp_knows_orbit']},
+ {t:`Ask the girl with the plait about the air and the food.`,y:[`"Lin," she says. "The air is fine, but the water tastes of metal. I think they are looking after us on purpose." She frowns. "That is the part that scares me." She joins you.`,'xp+m mp+2 ally:sp_lin']},
+ {t:`Thank them, but say you want to think first.`,y:[`They nod, a little disappointed. "We will be here," says Noor. You are not sure that you can do this alone.`,'xp+s']} ]);
+
+S_('sp1_cell','Reading the Cell','cellblock|🔍 🚪',
+`You walk the length of the cell, slowly, the way you do when a teacher has told you to look carefully at a problem. A heavy, clear door, with a panel of glowing symbols beside it. A grille in the floor, breathing out cool air. A ceiling lamp that pulses, very faintly, every ten seconds. Beyond the glass, a corridor, where small round machines glide past at regular intervals.\nEvery lock has a weakness, you think. Every machine has a habit. You only have to find them.`,[
+ {t:`Study the door panel.`,c:'INT 9 craft',y:[`The symbols are not words. They are numbers, in a strange, curly script, arranged in a row that grows by a rule. You copy the first few into your hand. You think you know what the next one is.`,'xp+l mp+2 insight:4 flag:sp_door_known'],n:[`The symbols swim in front of your eyes. Whatever they say, you cannot read them yet.`,'xp+s']},
+ {t:`Feel the airflow at the floor grille.`,c:'WIS 8 survive',y:[`The air comes from the left, and, tracing it, you realise the grille connects to a ventilation shaft about as wide as your shoulders. A way out, if you are small enough, and brave enough.`,'xp+m mp+1 flag:sp_vent_known'],n:[`Cold air, a faint rattle, and nothing more.`,'xp+s']},
+ {t:`Time the drones that glide past the window.`,c:'INT 8 lore',y:[`One drone every ninety seconds. The corridor is clear for about thirty of them. You note it down with a finger on the cold glass, and a little spark of hope lights up inside you.`,'xp+m mp+2 flag:sp_patrol_known'],n:[`The drones drift past in no pattern that you can see.`,'xp+s']},
+ {t:`Sit down, and think.`,y:[`For ten silent minutes, you do not do anything at all. It is the hardest thing you have done so far. But when you stand up again, your head is clearer.`,'xp+s mp+3']},
+ {t:`Press the big glowing button beside the door.`,y:[`A soft chime. The panel beside the door was never a door lock at all: it opens the outer shutter of the great window, and the wall of clear glass beside it hisses apart. The air leaves the cell in one long roar. Your adventure ends here.`,'die']} ]);
+
+S_('sp1_warden','The Warden Drone','cellblock|🤖 🔑',
+`With a soft hiss, the door slides open, and a warden drone glides in on a cushion of air, trailing a long, flat tray. It is round, grey and about the size of a beach ball, with a single red lens that swivels from child to child. It drops a tray of food into the middle of the floor and begins, methodically, to count.\nOn its side, a flat blue crystal chip hangs from a clasp, glinting.`,[
+ {t:`Slip behind the drone as it counts, and unhook the chip.`,c:'DEX 9 sneak',y:[`Your fingers slide the clasp open and the chip comes away with a faint click. The drone finishes counting, chirps, and glides out. You have an access shard in your hand, and a very loud heartbeat.`,'xp+l +sp_keyshard flag:sp_has_key mp+2'],n:[`The drone's lens swivels. A low alarm whine, a hard shove and you are on the floor with a bruised knee. It leaves, and the door closes. You did not get the chip.`,'xp+m hp-2 mp-2'],risk:[20,`The drone's beam sweeps across the room, and a group of the smallest children are herded into a corner and taken away.`,'kids-4']},
+ {t:`Block the door with a bunk so it cannot close.`,c:'STR 9 endure',y:[`You and Tomás, if he is with you, heave a bunk across the doorway. The drone hesitates, chirps, tries again, and finally withdraws, confused. The door stays open for exactly four seconds longer than usual.`,'xp+m mp+1'],n:[`The bunk screeches, jams and falls. The drone whirs angrily, and the door slams shut.`,'xp+s hp-1']},
+ {t:`Hold up your torch and flash a pattern at it.`,r:'item:sp_flashlight',y:[`Two long, three short. The drone's lens flickers, and it stalls, as though trying to work out whether this is a command. You step back and let it go.`,'xp+m mp+2 flag:sp_warden_known']},
+ {t:`Watch where it goes, and say nothing.`,y:[`It leaves along the corridor, turns left, and vanishes through a door that opens at its approach. Left, then through a door. You file the route away.`,'xp+s mp+1 flag:sp_warden_known']} ]);
+
+S_('sp1_plan','Making a Plan','cellblock|📝 🗺️',
+`The children sit in a ring around you, hundreds of eyes in the blue light, and for the first time you notice how quiet they are, hungry and exhausted, waiting.\nThe door, the vent and the corridor each have a weakness. You do not have much time. Somewhere beyond the glass, the stars are still moving past, and the Earth is still shrinking.\nWhatever you decide now, a hundred children will follow it.`,[
+ {t:`Get the door open, and lead everyone out together.`,y:[`You take a deep breath. "We go together," you say. "We go through the door, in groups of ten, and nobody gets left behind."`,'xp+m mp+2 flag:sp_plan_door']},
+ {t:`Send a small group through the vent to scout first.`,r:'flag:sp_vent_known',y:[`Four of the smallest volunteers wriggle into the shaft, and come back, grinning, ten minutes later, with a detailed description of the corridor beyond. It slows you down. It also makes everyone braver.`,'xp+l mp+3 flag:sp_plan_vent']},
+ {t:`Wait for the next patrol to pass, and move on the quiet side.`,r:'flag:sp_patrol_known',y:[`You wait, counting, until the drone has gone. In the long, perfect silence of the corridor, you give a quiet signal.`,'xp+m mp+2 flag:sp_plan_patrol']},
+ {t:`Rest for an hour first, to be at your best.`,y:[`It feels wasteful, and it also feels right. Children sleep, eat what is left, and talk, quietly, about home.`,'rest xp+s mp+3 flag:sp_kind']} ]);
+
+QS('sp1_lock','The Door Panel','cellblock|🔒 🔢',
+`Along the side of the door, a row of glowing symbols lights up one by one, in a slow, patient rhythm: one, one, two, three, five, eight. Then a blank space, blinking. The panel is waiting for the next number.\nBehind you, a hundred children are holding their breath.`,
+ ['Thirteen','Eleven','Twelve'],
+ [`The panel gives a soft, happy chime, and the door slides open. Each number is the sum of the two before it: one and one is two, two and one is three, three and two is five, five and three is eight, eight and five is thirteen. The Fibonacci pattern, in an alien script. You feel a wild urge to laugh.`,`The panel buzzes crossly. Eleven is a good number, but the pattern here adds the two numbers before. Eight and five.`,`The panel buzzes. Twelve does not follow the rule, which is to add the two numbers before it.`],
+ 'xp+xl flag:sp_out_cell mp+3'.replace('xp+xl','xp+l'));
+
+/* ================= CHAPTER 2: THE CORRIDORS ================= */
+G.chapter('sp2',{ story:'space', n:'Chapter 2: The Corridors', sub:'A hundred children and a very long hallway', ch:1, region:'sp_corridor', art:'corridor|🚶', age:12, btn:'Step out',
+  text:`The corridor outside is huge and strange, with a high, ribbed ceiling that curves like the inside of a whale, and walls that glow with long, slow ripples of light. The floor is faintly warm. The air smells of dust, metal and something sweet and unfamiliar, like burnt sugar.\nYou are standing, in your pyjamas and bare feet, in the first corridor of an alien ship, with a hundred children behind you. The only way to go is forward.`,
+  beats:()=>G.mix(['sp2_out','sp2_plaque','sp2_junction','sp2_patrol','sp2_vent','sp2_stars','sp2_cache','sp2_alarm'],7,{nocamp:true}) });
+
+S_('sp2_out','Into the Corridor','corridor|🚶 🚶',
+`The line of children files out through the open door, wide-eyed, clutching each other's hands. Nobody speaks. Your bare feet slap on the warm floor, and every sound seems to echo for ever along the curving walls.\nThe corridor splits, ahead, into three. Somewhere beyond, something is beeping, slowly, with the patience of a machine that has been doing the same job for a thousand years.`,[
+ {t:`Lead from the front, with the torch.`,r:'item:sp_flashlight',y:[`The beam makes a small, bright circle on the wall. The children cluster round it like moths. It is just a torch, but it is the only light that is yours.`,'xp+m mp+2']},
+ {t:`Send Tomás ahead to scout.`,r:'ally:sp_tomas',y:[`Tomás nods, and slips down the corridor with the quiet care of someone used to listening to engines. A minute later, he is back. "Clear," he says. "There is a door, three hundred paces along, on the left."`,'xp+m mp+2 bond:sp_tomas']},
+ {t:`Keep the children in a tight line along the wall.`,y:[`Everyone shuffles close to the wall, a long, silent snake of pyjamas. It is slow, but it makes you invisible to anyone who is looking down the middle.`,'xp+m mp+1']},
+ {t:`Count them again, just to be sure.`,y:[`A hundred, exactly. You breathe out. Every head is accounted for, and, absurdly, that makes you feel like you are doing something right.`,'xp+s mp+2']} ]);
+
+QS('sp2_plaque','A Message on a Pipe','corridor|✏️ 🔦',
+`Near the junction, a long metal pipe runs along the wall, and, near its base, someone has scratched a pattern into the paint with a fingernail. Dots and dashes, over and over: three dots, three dashes, three dots.\nThe scratches are old, very old, and they are not alien. A human, or several humans, were here before you.\n"Do you know what that says?" asks Noor, in a small voice.`,
+ ['SOS: a call for help','OK: all is well','Hello: a greeting'],
+ [`"SOS," you say, quietly. "Three dots, three dashes, three dots. A call for help, in Morse code, understood by everyone." Noor's eyes are very bright. Someone else was here. Someone else asked for help. Beneath it, you find a small arrow, scratched pointing left, toward a service hatch.`,`"OK" would be dash-dash-dash, dash-dot-dash. This is three dots, three dashes, three dots. It is a plea, and not a greeting.`,`"Hello" would be a very different, longer pattern. This one is the oldest cry for help in the world: three short, three long, three short.`],
+ 'xp+l mp+2 flag:sp_knows_arrow');
+
+S_('sp2_junction','Three Ways','corridor|🔀 🔀',
+`The corridor splits into three: a wide, brightly lit one with a smooth floor, a narrow, dim service passage with a dripping pipe and a stack of crates, and, on the left, a low hatch marked with a small scratched arrow.\nThe children cluster behind you, whispering. Every direction looks equally frightening.`,[
+ {t:`Take the wide, bright corridor.`,y:[`It is fast, and it is smooth, and every footstep seems to ring. Halfway along, a pale blue light slides over the ceiling, hesitates over your group, and moves on, like an eye.`,'xp+s mp-1 flag:sp_route_main'],risk:[25,`The light returns, wider and brighter, and a drone drifts in. In the confusion, a group of children at the back are cut off from the rest.`,'kids-4']},
+ {t:`Take the dim service passage.`,y:[`It is cramped and damp, and you have to climb over crates, but nobody sees you. When you emerge, the air smells of leaves.`,'xp+m mp+1 flag:sp_route_service']},
+ {t:`Follow the scratched arrow to the hatch.`,r:'flag:sp_knows_arrow',y:[`Beyond the hatch, a narrow tunnel runs straight and level for a long way, with scratch marks along the walls, the same dots and dashes, again and again. Whoever made them has been this way.`,'xp+l mp+3 flag:sp_route_hatch']},
+ {t:`Wait, and listen for a safer sign.`,y:[`After a few minutes, a faint hum comes from the service passage, followed by a distant, steady clanking. A cleaning drone, going away. The way is clear.`,'xp+m mp+1']},
+ {t:`Take the round door with the friendly green light above it.`,y:[`The round door sighs open on a tiny white chamber with a green light, and shuts behind you with a soft click. The light turns red. There is a long, loud hiss, and then there is nothing at all. It was an airlock. Your adventure ends here.`,'die']} ]);
+
+S_('sp2_patrol','The Patrol','corridor|🤖 👁️',
+`A low, dry whir echoes along the corridor. Three warden drones glide round a corner, side by side, their red lenses sweeping slowly from wall to wall. You and the children are in the open, in the middle of a long, empty stretch of floor.\nThe nearest alcove is fifteen paces behind you. The nearest door is thirty ahead.`,[
+ {t:`Hustle everyone back into the alcove.`,c:'DEX 8 sneak',y:[`Single file, bent low, you slip everyone into a deep, dark alcove, and press yourselves into the shadow. The drones glide past, a hand's breadth away, and their lenses sweep over you without a flicker. A hundred children, holding a hundred breaths.`,'xp+l mp+3 flag:sp_smart'],n:[`The last few are too slow, and a lens catches them. A short chase, a lot of shouting and some of the children are lost before you can get them back.`,'xp+m hp-1 kids-4']},
+ {t:`Create a distraction with a thrown shoe.`,y:[`Clang! A shoe clatters against a far wall. The drones swivel, chirp and glide toward it, and you lead everyone, quietly, the other way.`,'xp+m mp+2']},
+ {t:`Flash the torch in a pattern.`,r:'item:sp_flashlight',y:[`Two long, three short. The leading drone stalls, uncertain. The other two bump into it, and, while they sort themselves out, you slip everyone past.`,'xp+l mp+2 flag:sp_warden_known']},
+ {t:`Stand still and hope they go away.`,y:[`They do not go away. A beam of pale light sweeps over you, and every child cries out at once. The drones sort and herd, and a few children are lost in the crush.`,'xp+s hp-2 kids-8']} ]);
+
+S_('sp2_vent','The Long Vent','vent|🕳️ 🔦',
+`The only way round the locked door is through a ventilation shaft, a low, square tunnel barely wide enough for one person on hands and knees. It is dark, hot and smells of metal. A faint breeze blows through it from somewhere ahead.\nOne by one, a hundred children will have to crawl through it. The littlest are terrified.`,[
+ {t:`Crawl first, and talk to the others all the way.`,c:'CON 8 endure',y:[`You crawl, talking about nothing: your dog, your favourite food, a silly school joke. Behind you, the line of children is a long, shuffling chain of voices. By the end, some of them are even giggling.`,'xp+l mp+3 flag:sp_kind'],n:[`It is hotter than you expected, and the crawl is miserable. You make it through, scraped and sweating, and so does everyone else, but it is not pleasant.`,'xp+m hp-2']},
+ {t:`Send the smallest and fastest first.`,y:[`The little ones scamper off, delighted to be useful, and arrive at the end in two minutes. They open the grille from the other side, and the rest follow easily.`,'xp+m mp+2 flag:sp_kind']},
+ {t:`Sing a tune, so that nobody is afraid.`,r:'skill:sp_calm|skill:sp_history',y:[`Your voice echoes down the shaft, a silly, old counting song. By the third verse, everyone is singing, and the crawl turns into a parade.`,'xp+l mp+3 flag:sp_kind']},
+ {t:`Take the hatch on the left instead.`,y:[`The hatch opens on a long, wide ledge above a drop, with no railing. It is faster, but a lot more dangerous.`,'xp+s mp-1'],risk:[30,`A child at the back slips. You catch her wrist, but it is a very close thing, and the shock rattles everyone. Two others, terrified, refuse to go on.`,'hp-3 kids-2']},
+ {t:`Squeeze into the shiny hot duct beside the vent, to save time.`,y:[`It is wider than it looks, and warmer, and it leads, a long way down, to a coolant line. A white roar of steam fills the duct in a second. Your adventure ends here.`,'die']} ]);
+
+QS('sp2_stars','Where Are We?','corridor|🌌 🧭',
+`The corridor opens on a long window, and, for a moment, nobody moves. The darkness outside is crowded with stars, and, far off, in the corner, there is the little blue Earth, and, much nearer, a huge, pale curve of grey that must be the Moon.\n"If we know where we are," says Noor, softly, "maybe we can work out how to go home. In the northern sky, which star stays almost exactly still, so that sailors have always used it to find north?"`,
+ ['Polaris, the North Star','Sirius, the Dog Star','Betelgeuse, in Orion'],
+ [`"Polaris," you say. "It sits almost directly above the North Pole, so it hardly moves while the sky wheels round it." Noor nods, wide-eyed. Together, you find the faint, steady point, and work out which way the ship is facing. You write it all down in her notebook, and the notebook becomes a star chart.`,`Sirius is the brightest star in the night sky, but it moves. Think of the star that hardly moves at all.`,`Betelgeuse is the red shoulder of Orion, and it moves like everything else. Sailors needed a fixed point.`],
+ 'xp+l +sp_chart flag:sp_has_chart mp+2');
+
+S_('sp2_cache','The Supply Cache','corridor|📦 🔓',
+`Behind a panel marked with a fading, alien warning symbol, you find a shallow storage cupboard, jammed with supplies: foil-wrapped packets, a stack of folded silver blankets, a coil of cable, a small, sturdy torch and a row of bright orange pouches that smell faintly of oranges.\n"Take what we need," says Tomás, "and not what we want."`,[
+ {t:`Take the thermal blankets.`,y:[`Thin, light and surprisingly warm. Every child gets one, and, suddenly, the whole group looks like a flock of shiny silver birds.`,'xp+m +sp_foil mp+2 flag:sp_kind']},
+ {t:`Take the orange pouches to eat.`,y:[`Sweet, sticky and strangely delicious, with the texture of jelly. A few children take second helpings.`,'xp+s hp+5 mp+2'],risk:[25,`An hour later, half the group is complaining about stomach cramps. The pouches were meant for something with a very different digestion.`,'hp-3 mp-2']},
+ {t:`Take the coil of cable and the torch.`,r:'!item:sp_flashlight',y:[`A coil of insulated cable, and a heavy, bright torch with a lens like a fish's eye. Useful, if you have time to think of a use.`,'xp+m +sp_flashlight +sp_wire mp+1']},
+ {t:`Take only the cable, and leave the rest.`,y:[`A coil of cable, about as long as a skipping rope. You tuck it over your shoulder, and feel, absurdly, ready for anything.`,'xp+m +sp_wire mp+1']} ]);
+
+S_('sp2_alarm','Alarm!','corridor|🚨 🚪',
+`A shrill, wailing alarm tears through the ship, and every light in the corridor flashes red. Behind you, a heavy bulkhead door begins to slide shut, cutting the corridor in half. On one side, a hundred children, and, on the other, the way forward.\nYou have maybe fifteen seconds.`,[
+ {t:`Shout "Everybody run!" and dash for the closing door.`,c:'DEX 9 dodge',y:[`You sprint, and a hundred pairs of feet pound after you. The last child dives through the gap as the bulkhead slams, and you all collapse in a heap, laughing and gasping.`,'xp+l mp+3 flag:sp_kind'],n:[`Most of the children make it. A few at the back do not. You hear them banging on the other side, but the door does not open.`,'xp+m mp-3 kids-7']},
+ {t:`Jam the door with a rolled blanket and a bunk-rail.`,r:'item:sp_foil|item:sp_wire',y:[`The door grinds against the jammed rail, shrieks, and stops, a hand's breadth open. Just enough room for children, one by one. You keep it propped until the last one is through.`,'xp+l mp+3 flag:sp_pod_fixed']},
+ {t:`Work out the override on the control panel.`,c:'INT 9 craft',y:[`Beside the door, a flat panel, and behind its cover, a tangle of coloured wires. You think about circuits, switches and relays, and snip the right one. The bulkhead stops, and reverses. A dozen relieved children throw their arms round you.`,'xp+l mp+3 flag:sp_pod_fixed'],n:[`You snip a wire, and the bulkhead shudders to a halt, half open. Not far enough. You have to lift the smaller kids over, one at a time.`,'xp+m hp-1']},
+ {t:`Retreat, and find another way round.`,y:[`You turn back, and, for a very long, nervous hour, wind your way through side-corridors. Eventually, you find yourselves on the far side.`,'xp+s mp-1'],risk:[30,`A patrol finds your group in the side-corridors. In the scrum, a number of the children are cut off.`,'kids-6']} ]);
+
+/* ================= CHAPTER 3: THE HABITAT RING ================= */
+G.chapter('sp3',{ story:'space', n:'Chapter 3: The Habitat Ring', sub:'A garden at the edge of nowhere', ch:1, region:'sp_ring', art:'ring|🌳', age:12, btn:'Go through the door',
+  text:`The door opens on something that makes you stop in your tracks.\nA vast, curving land lies ahead: green fields, a winding stream, strange tall trees with glass-clear leaves and, high above, a long, curved ceiling that is also a floor, because the land curves up and away in both directions until it joins itself far overhead. It is a habitat ring, a whole little world built on the inside of a spinning wheel.\nIt is, somehow, the most beautiful thing you have ever seen. It is also, you suspect, the most dangerous.`,
+  beats:()=>G.mix(['sp3_ring','sp3_garden','sp3_mess','sp3_rest','sp3_oko','sp3_oko2'],7,{nocamp:true}) });
+
+S_('sp3_ring','The World Inside the Wheel','ring|🌳 🌀',
+`Weight presses gently on your feet: not quite the weight of Earth, but near enough. When you look up, there is land above your head, and a tiny, faraway river. The sky is a faint, soft glow from a single bright strip that runs round the whole ring like a bar of daylight.\nThe children gape. A very small boy bursts into a run across the soft green grass, laughing, and, for a few minutes, everyone forgets to be afraid.`,[
+ {t:`Let them run, and rest for a while.`,y:[`You let them run. Some fall asleep on the grass. Some paddle in the stream. A hundred children, a long way from home, remembering what it is to be children.`,'rest xp+m mp+4 flag:sp_kind']},
+ {t:`Work out why you are not floating.`,c:'INT 8 lore',y:[`"It is spinning," you say, to nobody in particular. "The wheel turns, and the floor pushes up at us the way a car seat pushes when we go round a corner." Tomás grins. Lin writes it down. You feel the world click into place.`,'xp+l mp+2'],n:[`You are not sure why, but you decide it does not matter, and move on.`,'xp+s']},
+ {t:`Scout ahead along the stream.`,c:'WIS 8 survive',y:[`Beyond a stand of tall, glassy trees, you find a low, round building with open doors, and, further on, a long green field with signs of recent footprints. You are not the first to pass this way.`,'xp+m mp+2'],n:[`The stream wanders in loops, and you lose the way for a long time.`,'xp+s mp-1']},
+ {t:`Warn everyone not to touch anything.`,y:[`You walk down the line, repeating it quietly: touch nothing, eat nothing, stay together. It slows the group, and it also keeps them safe.`,'xp+m mp+1 flag:sp_smart']} ]);
+
+QS('sp3_garden','The Garden of Glass Leaves','ring|🌿 💨',
+`Beyond the stream lies a grove of slender, glassy trees, their clear leaves ringing faintly in the air-current like tiny chimes. Under them, a carpet of shimmering blue flowers pulses in time with a slow, pale light.\nLin crouches, and sniffs the air. "These plants are making a lot of something," she says. "Every leaf is glowing. If I am right, there is a gas coming off them. Which gas do plants take in from the air to make their food?"`,
+ ['Carbon dioxide','Oxygen','Helium'],
+ [`"Carbon dioxide," says Lin, very quietly. "They breathe it in and make sugar, and give out oxygen. If this garden is big enough, it keeps the whole ring breathing. And that means the air in here is perfectly safe." You walk through the glass grove, and every child breathes deeply.`,`"Not quite," says Lin. "Plants give out oxygen. They take in something else, the stuff that we breathe out."`,`"Helium is in balloons," says Lin, with the ghost of a smile. "Plants take in carbon dioxide."`],
+ 'xp+l mp+3 flag:sp_garden_ok');
+
+S_('sp3_mess','The Mess Hall','ring|🍲 🍽️',
+`Long tables, benches too tall and a wall of little brightly coloured hatches. A few trays of steaming, odd-smelling food sit on a counter, as if someone has just left. A hundred hungry children stare at them, and a hundred stomachs growl.\n"They are not going to starve us," says Lin quietly. "They need us alive." She does not sound reassured.`,[
+ {t:`Test the food yourself first.`,y:[`You try the smallest portion. A soft, savoury paste, something like mashed potato with herbs. Nothing, for ten minutes. You nod, and the children fall on it.`,'xp+m hp+4 mp+2 flag:sp_kind'],risk:[20,`An hour later, a rash creeps up your arms, and half the children are scratching. The paste was fine for the Vell, and not for people with a particular enzyme.`,'hp-3 mp-3']},
+ {t:`Ask Lin to check it.`,r:'ally:sp_lin',y:[`Lin sniffs, tastes, and examines it with the care of a surgeon. "Protein, starch, vitamin B," she says. "Safe. Boring, but safe." She hands out the first portions with a very serious face.`,'xp+l hp+5 mp+3 bond:sp_lin']},
+ {t:`Share out a little food at a time, and wait.`,y:[`It takes hours, and it is exasperating. But nobody is sick, and everyone gets a little.`,'xp+m hp+3 mp+1']},
+ {t:`Take only the sealed packets, and leave the hot food.`,y:[`Sealed packets of nutrient paste, in dull grey foil. It is not delicious. It is, at least, certain.`,'xp+s hp+3 +sp_ration']},
+ {t:`Drink the bright blue drink in the little cups. It looks like squash.`,y:[`It does look like squash. It tastes sweet, and then metallic, and then very cold. It was not a drink, but a coolant for something with a different sort of body. Your adventure ends here.`,'die']} ]);
+
+S_('sp3_rest','What We Miss','ring|🌙 💭',
+`By the stream, in the long, soft, pretend evening of the habitat ring, the children sit in small groups and talk about home. A girl describes her grandmother's kitchen. A boy remembers a dog called Biscuit. Two sisters are quietly counting how many nights it has been since they last saw their mother.\nSomeone looks at you. "Where's your home?" she asks. "What's it like?"`,[
+ {t:`Tell them about your home, in as much detail as you can.`,y:[`You describe the street, the shop at the corner, the way the light looks on the kitchen wall at four in the afternoon. By the end, half the group is crying, and the other half is smiling, and you are doing both.`,'xp+l mp+5 flag:sp_kind']},
+ {t:`Promise to get everyone home.`,y:[`It is a very big promise. You say it anyway, and, to your own surprise, you mean it. A hundred faces turn toward you, trusting. You know you cannot let them down.`,'xp+m mp+2 flag:sp_kind']},
+ {t:`Ask them each to draw a picture of home, to keep.`,r:'item:sp_notebook',y:[`Pages are torn out of your notebook, and a hundred little drawings appear: a house, a dog, a tree, a table with a cake. By the end, the grass is covered in tiny pictures of Earth.`,'xp+l mp+4 flag:sp_kind']},
+ {t:`Listen, and say nothing.`,y:[`Sometimes, you think, listening is the bravest thing you can do.`,'xp+m mp+3']} ]);
+
+S_('sp3_oko','The Creature in the Archive','ring|🐙 📚',
+`At the foot of a tall, white, spiral tower, a round door stands open. Inside, rows and rows of silver shelves hold small glowing cubes, and, on a low platform at the centre, something moves.\nIt is large, soft, grey-pink and many-armed, with huge dark eyes and a skin that ripples in slow patterns of colour. It is the first alien you have ever seen. It has seen you, too, and it has frozen, one arm half-raised, all its colours draining to pale white.\nIt is, you realise, just as frightened as you are.`,[
+ {t:`Hold up the translator, and say hello.`,r:'item:sp_translator',y:[`The translator crackles, hisses, and produces a soft, halting voice: "...Hello? You... are children. The small ones. I did not... wish this." The creature's colours slowly begin to return, in a gentle, shy green.`,'xp+l mp+3 flag:sp_knows_vell']},
+ {t:`Hold up your empty hands, and sit down slowly.`,c:'CHA 8 persuade',y:[`You sit cross-legged, palms open, and wait. For a long, long time, nothing happens. Then, very slowly, the creature lowers its arm, and its colours soften. It is not threatening. It is listening.`,'xp+l mp+3 flag:sp_knows_vell'],n:[`The creature flinches, and slides, quivering, behind a shelf. It is some time before it comes out again.`,'xp+m mp-1']},
+ {t:`Use a pen and paper to draw a picture of yourself.`,r:'item:sp_notebook',y:[`You draw a stick figure, the Earth, a house. The creature's skin ripples with soft, curious patterns. It points an arm at the Earth, then at you, then at the stars. It understands.`,'xp+l mp+3 flag:sp_knows_vell']},
+ {t:`Back away, and leave it alone.`,y:[`Whatever it is, it has not hurt anyone. You close the door gently, and walk on, thinking.`,'xp+s mp+1']} ]);
+
+S_('sp3_oko2','What Oko Knows','ring|🐙 ⏳',
+`Its name is Oko, or something close to it. Through the translator, in a slow, careful trickle of words, it tells you the truth.\nThe Vell are scholars and collectors. They have crossed the stars for a thousand years, gathering one example of everything: a stone, a flower, a song and, this time, a hundred children, "because the young learn fastest, and we wished to understand how." Oko was the ship's archivist. It argued against the taking. It was locked in the library for its trouble.\n"In six of your hours," says Oko, "the ship will leave your sun's neighbourhood. Then you will never go home. There is a shuttle, in the hangar, that could carry everyone. I can show you the way. If you will take me with you."`,[
+ {t:`Promise to take Oko with you.`,y:[`Oko's colours flare, a beautiful gold and violet. "Thank you," says the translator, and, for a moment, its voice sounds very young. Oko slides down from its platform and falls into step beside you.`,'xp+xl mp+3 ally:sp_oko flag:sp_oko_friend flag:sp_knows_vell bond:sp_oko'.replace('xp+xl','xp+l')]},
+ {t:`Ask how you can be sure it is telling the truth.`,c:'WIS 9 persuade',y:[`Oko pauses, and shows you a cube from the shelf. A recording: a hundred children, sleeping, in a long white room. "I made this," it says, "for the day when someone might ask." You believe it.`,'xp+l mp+2 ally:sp_oko flag:sp_oko_friend flag:sp_knows_vell'],n:[`Oko hesitates, and its colours go dim. "I understand," it says, sadly. "Trust is not given quickly." It tells you where to find the hangar, and does not join you.`,'xp+m flag:sp_knows_vell']},
+ {t:`Take its map, but not its company.`,y:[`Oko gives you the route, in careful, sad ripples of light, and watches you go. You feel, quietly, ashamed, and cannot say why.`,'xp+m +sp_podcode flag:sp_oko_betrayed']},
+ {t:`Tell the Wardens where Oko is hiding.`,y:[`You do not do it, and you are glad. Some choices are very easy once you have looked them in the face.`,'xp+s mp+2 flag:sp_kind']} ]);
+})();
+
+</script>
+<script>
+/* STOLEN SKY — Chapters 4-6 and endings: The Laboratory, The Engine Decks and Hangar, The Long Way Down */
+(function(){
+const G = globalThis.G, { S_, QS } = G.grh;
+
+/* ================= CHAPTER 4: THE LABORATORY ================= */
+G.chapter('sp4',{ story:'space', n:'Chapter 4: The Laboratory', sub:'What the Vell wanted to learn', ch:2, region:'sp_lab', art:'lab|🧪', age:12, btn:'Open the door',
+  text:`The archive tower has a second door, and Oko, if it is with you, will not go through it. "That is where they study us," it says, its colours turning grey. "I am sorry. I cannot make myself."\nBeyond is a long, humming, green-lit room full of tanks and tubes and silent machines. In the tanks float things you have only ever seen in books: a coral reef in miniature, a drifting cloud of tiny glowing creatures, a single slowly turning oak seedling.\nThe Vell collect one of everything. Somewhere in here, you realise, they are keeping something of yours.`,
+  beats:()=>G.mix(['sp4_lab','sp4_tanks','sp4_sample','sp4_bay','sp4_warden','sp4_sleepers'],7,{nocamp:true}) });
+
+S_('sp4_lab','Specimens','lab|🧪 🌱',
+`Row on row of glass tanks, each one lit from beneath. A seahorse the size of a thumb. A swarm of fireflies, glowing in a slow wave. A crystal of salt as big as a fist, still growing. A small label on each one, in neat, curly script.\nThe children press their faces to the glass. One of the little ones says, in a very small voice, "Are we going to be in one of those?"`,[
+ {t:`Tell her no, and mean it.`,y:[`"No," you say, kneeling. "We are going home. All of us." She nods, trusting you completely, which is a heavy thing to be trusted with.`,'xp+m mp+2 flag:sp_kind']},
+ {t:`Read the labels, and see what you can learn.`,c:'INT 8 lore',y:[`The labels are in numbers, and the numbers are a catalogue: where, when, how many. There is one for the Earth, and, beside it, a single line: "Taking complete. Return not planned."`,'xp+l mp+1 insight:4 flag:sp_knows_vell'],n:[`The labels swim, and make no sense.`,'xp+s']},
+ {t:`Look for something that might be useful.`,c:'WIS 8 survive',y:[`On a low shelf, you find a coil of fine wire, a small sealed pack of cells and a hand-sized sample of ice. The cells look rather like batteries.`,'xp+m +sp_cellpack mp+1'],n:[`Nothing but glass, and more glass.`,'xp+s']},
+ {t:`Keep everyone moving, and away from the tanks.`,y:[`Better safe than sorry. You lead the group along the wall, and nothing happens at all.`,'xp+s mp+1']},
+ {t:`Reach into the glowing tank and lift out the little glowing fish.`,y:[`The little fish is not a fish. It is a living battery. A bright blue flash runs up your arm, and the whole lab goes silent. Your adventure ends here.`,'die']} ]);
+
+S_('sp4_tanks','The Tank of Sleepers','lab|💤 🛏️',
+`At the far end of the hall, a row of long, pale pods holds sleeping shapes: not Vell. They are children. A dozen of them, in pyjamas, their faces calm, their breath fogging the glass. Their names are written on small cards. These are children who were separated from your group, in the corridor, in the alarms.\nThe pods are sealed. The panel beside them has a lever, a dial and a row of tiny, flickering lights.`,[
+ {t:`Try the lever.`,y:[`The lever moves, and a long, low alarm rings through the lab. The pods stay shut. Somewhere above, boots, or whatever the Vell wear, begin to run.`,'xp+s hp-1 mp-2'],risk:[40,`The drones arrive quickly, and a group of children is hustled away down a side corridor before you can stop them.`,'kids-3']},
+ {t:`Read the panel carefully before you touch anything.`,c:'INT 9 craft',y:[`The panel is a sleep-controller. The dial sets how deeply they sleep, and the lights tell you what is safe. You turn the dial slowly, to the smallest setting, and the pods hiss open, one after another. Twelve children blink, stretch and burst into tears at the sight of you.`,'xp+l kids+3 mp+4 flag:sp_lab_ok'],n:[`You turn it too fast. The pods hiss, and a few open, but the rest stay shut, and the children inside whimper. It will take time.`,'xp+m kids+1']},
+ {t:`Ask Lin, who knows about bodies, what to do.`,r:'ally:sp_lin',y:[`Lin studies the readout, frowns and taps the lights in a certain order. "They are not hurt," she says. "Only very deeply asleep. Wake them slowly." You do, one by one, and each one wakes with a gasp and a shout for their mother.`,'xp+l kids+4 mp+4 bond:sp_lin flag:sp_lab_ok']},
+ {t:`Leave them for now, and come back with help.`,y:[`It is the hardest thing to do, standing there, with a dozen sleeping faces in front of you. You mark the place carefully. You tell yourself you will return.`,'xp+s mp-2']} ]);
+
+QS('sp4_sample','The Sealed Tray','lab|🧬 🔬',
+`On a bench beside the pods lies a tray of small glass slides, each labelled with a child's name. Under a flat grey lens, a slide shows a swirl of tiny pale shapes, and, in the middle of each one, a small dark dot.\n"That is a cell," says Lin, very quietly. "And that dark dot in the middle is the part that holds the instructions that make every one of us. The Vell have a slide for every child. What is the dark dot called?"`,
+ ['The nucleus','The membrane','The ribosome'],
+ [`"The nucleus," says Lin. "It holds our DNA: the instructions for building a person." She looks at the tray, and her voice shakes with anger. "They wanted to learn how we are made. They did not need to take us to do that." You sweep the slides into a pocket. Whatever the Vell have learned about you, they will not be keeping it.`,`"The membrane is the thin skin round the cell," says Lin. "The thing in the middle is something else."`,`"Ribosomes are tiny workshops floating round the cell," says Lin. "The dark dot in the centre is bigger, and does a different job."`],
+ 'xp+l mp+3 +sp_sample');
+
+S_('sp4_bay','The Quiet Bay','lab|🩺 🛏️',
+`A small room off the lab: white, tidy and warm. A row of small beds, each with a sleeping child. A soft machine hums above every bed, and a thin, green line crawls across its glass face. A younger boy on the nearest bed has a flushed face and a very quick, shallow breath.\n"Fever," says Lin, touching his forehead. "A bad one."`,[
+ {t:`Give him water and a cool cloth.`,y:[`Slowly, patiently, you sponge his forehead, and he settles. By morning, the fever has gone, and he is awake, asking where his dog is.`,'xp+l mp+3 kids+1 flag:sp_kind']},
+ {t:`Use the antidote from the first-aid pouch.`,r:'item:sp_antidote',y:[`You give him a measured dose. Within minutes his breathing eases, and his colour returns. "How did you know?" asks Lin, softly.`,'-sp_antidote xp+l mp+3 kids+1 flag:sp_kind']},
+ {t:`Carry him out and find help elsewhere.`,c:'STR 8 endure',y:[`You hoist him on your back, and set off. It is slow, and your arms ache. But you find the cool shade of the garden, and he sleeps.`,'xp+m mp+2 kids+1'],n:[`He is heavier than you thought, and the corridor is long. You have to stop, again and again, and by the time you arrive, he is much worse.`,'xp+s hp-2 mp-2']},
+ {t:`Leave him, and go on. Time is short.`,y:[`You turn away, and it feels like swallowing stones. A few hours later, you learn that the Vell have moved him. You do not know where.`,'xp+s mp-4 kids-1']} ]);
+
+S_('sp4_warden','The Warden of the Deep','lab|🤖 🔴',
+`A tall, slender machine steps out between two tanks, like a heron on stilts. It has no face, only a long, curved lens, a ring of tiny red lights and a soft voice in your own language, flat and measured, like an announcement in a station.\n"Subjects are not permitted in the laboratory. Please return to your cell. You will be provided with food, water and an appropriate environment."\nIt is not angry. It does not understand why you are afraid. That is somehow worse.`,[
+ {t:`Reason with it. Tell it that you are children, not subjects.`,c:'CHA 9 persuade',y:[`"Children," it repeats, thoughtfully. "A sub-class of subject." There is a long, odd pause. "Query: the preferred environment of children." You tell it: home, parents, sky. The red lights flicker. It steps aside, and says, "Noted." You are through.`,'xp+xl mp+4 flag:sp_warden_down'.replace('xp+xl','xp+l')],n:[`"Subjects will return to their cell," it says, and extends a long, thin arm. A small crowd of children is gathered up before you can stop it.`,'xp+m hp-1 kids-5']},
+ {t:`Confuse its sensors with the silver blankets.`,r:'item:sp_foil',y:[`You and the children drape the blankets over the lens, and flap them wildly. The warden turns in circles, clicking in confusion. By the time it recovers, everyone has slipped past.`,'xp+l mp+3 flag:sp_warden_down']},
+ {t:`Lure it away with a noise, and run.`,y:[`You hurl a tray against a far wall. The warden swivels, extends a long arm and glides after the sound. You lead everyone the other way, as quietly as a hundred children can.`,'xp+m mp+2'],risk:[30,`The warden is cleverer than it looks. It turns, and a grey beam sweeps the group. A few children, caught, are gathered and led away.`,'kids-5']},
+ {t:`Do as it asks, and go back.`,y:[`You obey. It is a very long, very silent walk, and, when you reach the cell, the door shuts behind you. You will have to start again.`,'xp+s mp-3 kids-3']} ]);
+
+S_('sp4_sleepers','What the Vell Did Not Know','lab|📜 🧠',
+`In a small side room, a screen glows, playing a loop of pictures: children laughing, a dog on a beach, a mother reading in a bright kitchen. Something the Vell recorded, from a window somewhere, in the hours before they took you. Under each picture, a label, in their curly script.\n"They did not understand," says Noor, softly. "Look at the labels. They wrote 'behaviour of the young'. They did not realise that was somebody's mum."`,[
+ {t:`Take the recording with you.`,y:[`You pocket the little cube. Maybe, one day, someone on Earth will want to know what the Vell saw.`,'xp+m mp+2 flag:sp_knows_vell']},
+ {t:`Smash the screen.`,y:[`The screen shatters. It feels good for about a second, and then you are standing in a room full of broken glass with a lot of noise to explain.`,'xp+s hp-1 mp-1']},
+ {t:`Stay for a moment, and watch.`,y:[`It is the only window you have had to home since you were taken. You watch it, quietly, until Noor tugs your sleeve.`,'xp+m mp+3']},
+ {t:`Ask Noor to copy what she can into her notebook.`,r:'ally:sp_noor',y:[`Noor writes quickly: names, places, a beach, a street sign. "In case," she says. "In case anybody ever needs to know where we were."`,'xp+l mp+2 bond:sp_noor']} ]);
+
+/* ================= CHAPTER 5: THE ENGINE DECKS AND THE HANGAR ================= */
+G.chapter('sp5',{ story:'space', n:'Chapter 5: The Engine Decks', sub:'Heat, pipes and a very big shuttle', ch:3, region:'sp_engine', art:'engineroom|🔥', age:12, btn:'Go down',
+  text:`The ladder goes down, and down, and the air gets hotter with every rung. A great low roar fills the dark, and a faint orange glow lights the walls.\nThe engine decks of the Vell ship are as big as a cathedral, a warm, humming jungle of pipes, valves and pulsing orange coils, with great ducts that breathe in and out like the lungs of a sleeping animal.\nSomewhere on the far side, past all this noise and heat, is the hangar. Somewhere in the hangar is the shuttle.`,
+  beats:()=>G.mix(['sp5_engine','sp5_pipes','sp5_power','sp5_oko','sp5_hangar','sp5_shuttle','sp5_load'],8,{nocamp:true}) });
+
+S_('sp5_engine','The Furnace Gallery','engineroom|🔥 🌡️',
+`A narrow metal walkway runs along the edge of a drop, with a huge, glowing coil on one side and a wall of pipes on the other. The heat is like standing too close to an oven. Sweat prickles on your face. The children, one after another, file along it, coughing.\nHalfway along, a section of the walkway is missing, a gap about two metres wide, with a long drop beneath.`,[
+ {t:`Make a bridge of the long ladder-rail and a blanket.`,c:'INT 8 craft',y:[`You lash the rail across the gap with the cable, and test it with your weight. It holds. A hundred children cross it, one at a time, with you counting every head.`,'xp+l mp+3 flag:sp_pod_fixed'],n:[`The rail slips, and clangs down the shaft. Two of the smaller children shriek. You find another way, but it takes a long time, and you lose more than you meant.`,'xp+m hp-1 kids-2']},
+ {t:`Jump across, and pull the others over.`,c:'DEX 9 dodge',y:[`You clear the gap in one leap, and brace yourself, catching each child's hand as they jump. It is nerve-racking, but nobody falls.`,'xp+l mp+3'],n:[`Your foot slips at the edge, and you hang by your fingertips until Tomás pulls you up. Everyone else, shaking, refuses to jump.`,'xp+m hp-3 mp-2'],risk:[25,`A child at the back loses her nerve and jumps too short. You grab her sleeve, but she is gone.`,'kids-1 hp-2']},
+ {t:`Find another route round, through the service tunnel.`,y:[`It is dark, damp and low. But it is cool, and it leads, after a long time, round the gap and out into a wide, quiet gallery.`,'xp+m mp+1']},
+ {t:`Wait here for the heat to pass.`,y:[`It does not pass. The coil pulses, and the walkway ticks and creaks. Waiting makes you hotter, and no safer.`,'xp+s hp-2 mp-1']},
+ {t:`Cross the shining coil, because it looks like a bridge.`,y:[`It is not a bridge. It is the heart of the engine, and it glows white-hot beneath its dull orange cover. The cover cracks under your foot. Your adventure ends here.`,'die']} ]);
+
+QS('sp5_pipes','The Hissing Valve','engineroom|💨 🔧',
+`A thick pipe along the wall hisses, and, as you watch, a bead of white steam shoots from a seam. The pressure gauge on its side trembles, and the needle creeps toward a red line.\n"It will burst," says Tomás, wiping his hands on his pyjamas. "A pipe like that has to let off steam somewhere. If you heat a gas in a sealed space, what happens to its pressure?"`,
+ ['It goes up','It goes down','It stays the same'],
+ [`"It goes up," says Tomás. "The molecules move faster, and push harder on the walls." He reaches for a small valve beside the pipe and turns it, slowly, a quarter turn. The hiss softens, and the needle drifts back. "There. Just a little release." You walk on, past the cooling pipe, with new respect for plumbing.`,`"If it went down," says Tomás, "pipes would be much safer. Think about a pressure cooker."`,`"If nothing changed," says Tomás, "nobody would ever bother with safety valves."`],
+ 'xp+l mp+3 flag:sp_pod_fixed');
+
+QS('sp5_power','The Dead Cell','engineroom|🔋 ⚡',
+`A broad, flat machine in an alcove has a row of empty sockets, like a charger. A small sign beside it, in curly script, shows four glowing cells in a row, with a number above each one: 3, 4, 6, 9.\nYou have the cell pack from the lab, and it is flat. "It needs the rest of the cells to run," says Tomás. "The Vell numbers show how many units each cell holds. We have to find the total." He taps the sign. "What is 3 + 4 + 6 + 9?"`,
+ ['22','21','23'],
+ [`"Twenty-two," says Tomás, grinning. The charger hums. The cells glow green, one by one. You tuck the pack into your pocket, charged, heavy and warm. It feels like carrying a piece of the sun.`,`"Twenty-one," says Tomás, and the charger gives a rude buzz. "Try again. Three and four make seven, then six, then nine."`,`"Twenty-three," says Tomás, and the charger buzzes. "Too many. Add them again, slowly."`],
+ 'xp+l mp+3 +sp_cellpack');
+
+S_('sp5_oko','Oko Chooses','engineroom|🐙 💔',
+`In a cramped control alcove, Oko is waiting, its skin pale and rippling. "I must tell you something," it says. "The Vell are not cruel. They are curious. When they learn you have escaped, they will not hunt you. They will study how you did it." It pauses. "And they will take another hundred from somewhere else, to see whether they behave the same way."\nA long, low silence.\n"There is a way to stop it," says Oko. "I can wake the ship's long-sleeper, the old mind, and ask it to turn the ship away from your Sun. But it will notice me. I do not think I will come back."`,[
+ {t:`Say yes. Ask Oko to do it.`,r:'ally:sp_oko',y:[`"Thank you," says Oko, and its colours flush a warm, steady gold. "I will do it, and you will go." It touches your hand, once, with a soft, cool arm. It is the last you see of it. A few hours later, the ship begins to turn.`,'xp+xl mp+5 drop:sp_oko flag:sp_oko_sacrifice flag:sp_kind'.replace('xp+xl','xp+l')]},
+ {t:`Say no. Ask Oko to come with you.`,r:'ally:sp_oko',y:[`"That is kind," says Oko, "but it will not save anyone else." It lowers its arms. "I will come with you, if you will have me. But the Vell will be back."`,'xp+m mp+2 bond:sp_oko']},
+ {t:`Ask whether there is a way to do both.`,c:'INT 9 lore',r:'ally:sp_oko',y:[`"There might," says Oko slowly. "If I wake the old mind from inside the hangar, not here, it will turn the ship before it notices me. But it must be done at the same moment as the shuttle launch." Its eyes widen. "Ah. That is a very hard thing to time."`,'xp+xl mp+4 flag:sp_oko_plan'.replace('xp+xl','xp+l')],n:[`"I do not know," says Oko, sadly. "I wish I did."`,'xp+m']},
+ {t:`You are not sure you can trust any of this.`,y:[`Oko watches you, patient, quiet. "That is wise," it says. "I will show you the way to the hangar. After that, the choice is yours."`,'xp+s mp-1 flag:sp_oko_betrayed']} ]);
+
+S_('sp5_hangar','The Hangar','hangar|🚀 🏭',
+`At last, a vast, quiet space, like an airport at night. Rows of dark, sleek ships hang from the ceiling on slender arms, and a single, long, pale shuttle sits on the floor, its belly open. It is bigger than you imagined: long enough for a hundred children, and then some.\nBeyond its nose, a huge curved door stands closed. Beyond that door is nothing but space. And, in the corner of a high, wide window, a small, patient, blue Earth.`,[
+ {t:`Gather the children and count again.`,y:[`You count them, in groups of ten, again and again. The number is the number it is. Every head matters now.`,'xp+m mp+3 flag:sp_cell_clear']},
+ {t:`Walk all the way round the shuttle, looking for damage.`,c:'WIS 8 survive',y:[`On the left side, a long dark crack. A bent landing strut. A loose panel by the nose. You tick them off on your fingers, and feel the shape of the work ahead.`,'xp+m mp+2 flag:sp_shuttle_ok'],n:[`It looks fine. It looks big and fine. You will find out otherwise soon.`,'xp+s']},
+ {t:`Ask Tomás what he thinks.`,r:'ally:sp_tomas',y:[`Tomás, wiping his hands, circles the shuttle slowly, whistling through his teeth. "It is like a very big, very clean tractor," he says. "Two things are broken. One is the coolant line. The other is the power coupling." He grins. "I can fix both. Give me an hour."`,'xp+l mp+3 bond:sp_tomas flag:sp_shuttle_ok']},
+ {t:`Make for the control console at the nose.`,y:[`The console is dark and cold. Its buttons are in curly script. You press one, and nothing happens, and a little red light begins to blink.`,'xp+s mp-1'],risk:[30,`A klaxon begins to ring, deep inside the hangar. Armoured drones slide from their roosts, and the nearest groups of children scatter in alarm.`,'kids-5']},
+ {t:`Climb into the open airlock, and wave to the children from the far side of the glass.`,y:[`You step into the little white chamber, turn, and wave. A hand on the far side, a child's hand, presses a bright round button, thinking it is the door. The air leaves. Your adventure ends here.`,'die']} ]);
+
+S_('sp5_shuttle','Mending the Shuttle','hangar|🔧 🛠️',
+`The shuttle is old, and has not flown for years. Its coolant line is cracked, its power coupling is dead, and its landing strut is bent. Tomás, Noor and a dozen willing helpers swarm over it with spanners, wire and a great deal of improvised hope.\nThe clock is ticking. Somewhere above, the ship is drifting a little further from home with every hour.`,[
+ {t:`Weld the coolant line with the multitool.`,r:'item:sp_multitool',c:'DEX 9 craft',y:[`The little flame hisses, the metal blushes red, and the crack closes, a thin, neat line. You hold your breath, and the pressure gauge steadies. A cheer goes up from the children.`,'xp+l mp+3 flag:sp_pod_fixed'],n:[`The flame is too hot, and the line buckles. You have to start again, and burn your fingers.`,'xp+m hp-2']},
+ {t:`Replace the coupling with the charged cell pack.`,r:'item:sp_cellpack',y:[`The pack clicks into the socket, and the dead console blinks awake, line after line of strange, curling script. The lights on the shuttle's belly come on, one by one, like stars.`,'-sp_cellpack xp+l mp+4 flag:sp_shuttle_ok']},
+ {t:`Straighten the strut with a lever and a pile of crates.`,c:'STR 8 endure',y:[`Together you heave, and the strut groans, bends, and settles with a clang. Good enough to land on, if you land softly.`,'xp+m mp+2 flag:sp_pod_fixed'],n:[`The strut will not move. It is bent in the one way you cannot undo. You will have to land carefully.`,'xp+s hp-1']},
+ {t:`Rush it, and hope for the best.`,y:[`There is no time to be thorough. You patch what you can, and trust the rest to luck.`,'xp+s mp-1'],risk:[45,`Mid-repair, a spark jumps from the coupling, and, with a roar, a sheet of coolant sprays the hangar. In the confusion, a number of the children are lost.`,'hp-3 kids-8']} ]);
+
+QS('sp5_load','The Seats','hangar|💺 🔢',
+`The shuttle has ten rows of seats along each side, and four more in a long cabin at the back. Noor is pacing up and down the aisle with her notebook. "A hundred children," she says. "And these are the seats. We have to get every one of you strapped in before we launch."\nShe frowns at her notes. "Each row on the left holds five. There are ten rows on the left. The same on the right. How many children does the main cabin hold?"`,
+ ['100','50','110'],
+ [`"A hundred," says Noor. "Ten rows of five on each side: fifty and fifty." She beams. "And the four extra rows at the back can hold any teachers, supplies, or friends." You count again, and the arithmetic holds. Everyone fits. You strap them in, one by one, checking every belt.`,`"Fifty is only one side," says Noor. "There is another side, just the same."`,`"A hundred and ten would be a very tight squeeze," says Noor. "Count again: ten rows of five, on two sides."`],
+ 'xp+l mp+3 flag:sp_cell_clear');
+
+/* ================= CHAPTER 6: THE LONG WAY DOWN ================= */
+G.chapter('sp6',{ story:'space', n:'Chapter 6: The Long Way Down', sub:'Launch, reentry and the blue below', ch:4, region:'sp_descent', art:'earthview|🌍', age:12, btn:'Launch',
+  text:`The shuttle shudders, and the hangar floor slides away. A great curved door opens, slow and enormous, on a darkness full of stars. Through the window, the Earth is no longer a football: it is a blue, shining, ordinary marble, with a dark side and a bright side.\nA hundred children are strapped into their seats, and every one of them is looking at you.\nSomewhere, behind you, the ship is waking up.`,
+  beats:()=>G.mix(['sp6_launch','sp6_chase','sp6_nav','sp6_reentry','sp6_shield','sp6_chute'],8,{nocamp:true}).concat(['!gate','sp6_splash','sp6_set']) });
+
+QS('sp6_launch','Cutting Loose','earthview|🚀 ⏱️',
+`The shuttle's engines murmur. The countdown on the console, in strange numbers, is running. Noor, in the co-pilot's seat, reads the figures out with a shaking voice. "The burn needs to last twelve seconds at full power, then rest for four, then another twelve. How long altogether?"\nYour hand hovers over the throttle.`,
+ ['28 seconds','24 seconds','32 seconds'],
+ [`"Twelve, four, twelve," says Noor. "Twenty-eight seconds, start to finish." You time it on your fingers, ease the throttle and feel the shuttle surge, a long, steady push into your seat. The ship, behind you, shrinks to a small grey dot.`,`"That is only the two burns," says Noor. "Do not forget the rest in the middle."`,`"That is too long," says Noor. "Twelve plus four plus twelve. Slowly."`],
+ 'xp+l mp+3 flag:sp_launched');
+
+S_('sp6_chase','The Hunters','earthview|👾 🛰️',
+`Behind you, the great ship's side lights up, and, one by one, small bright shapes drop away from it. They are drones, a dozen of them, and they are fast. They fan out like a flock of birds, gaining on you with every second.\n"They are not firing," says Noor, in a very small voice. "They are trying to pull us back."`,[
+ {t:`Fly a zig-zag course to shake them off.`,c:'DEX 9 dodge',y:[`You throw the shuttle left, right, left. The drones follow, overshoot, turn and follow again. You gain a few precious seconds each time. A hundred children hold on and, mostly, do not scream.`,'xp+l mp+3'],n:[`The shuttle lurches, and a few of the belts give way. Children tumble across the cabin, and some are hurt.`,'xp+m hp-2 kids-3']},
+ {t:`Fly straight for the Earth, as fast as you can.`,y:[`It is a gamble. The drones chase, but they have not got enough power to keep up. You arrive at the edge of the atmosphere with the engines screaming.`,'xp+s'],risk:[35,`The drones close in, and a beam sweeps the shuttle. A tremor runs through the hull, and some of the seat-locks release. A number of children are pulled toward the open cargo bay.`,'kids-6 hp-2']},
+ {t:`Flash the torch, in a pattern, out of the window.`,r:'item:sp_flashlight&flag:sp_warden_known',y:[`Two long, three short. The lead drone stalls, and, seeing the pattern, the rest hesitate, confused. They circle, then, one by one, drift back toward the ship.`,'xp+l mp+4']},
+ {t:`Ask Oko to speak to them.`,r:'ally:sp_oko',y:[`Oko leans toward the console, and its skin ripples in a long, urgent series of colours. The drones slow, circle, and turn. "I told them that you are guests," it says. "I told them that the collection is closed." It sags, exhausted.`,'xp+xl mp+5 bond:sp_oko'.replace('xp+xl','xp+l')]} ]);
+
+QS('sp6_nav','Finding Home','earthview|🗺️ 🧭',
+`Below you, the planet fills the whole window. Blue ocean, white cloud, dark land. Noor holds up her notebook. "We cannot just fall," she says. "We have to land somewhere with water, or flat ground, away from cities." She chews her lip. "The biggest ocean on Earth, the one that covers a third of the whole planet. What is it called?"`,
+ ['The Pacific Ocean','The Atlantic Ocean','The Indian Ocean'],
+ [`"The Pacific," says Noor. "Bigger than all the land put together." You nod, and steer for the great, empty blue, where a splashdown could not hurt anyone. Far below, a faint spangle of islands glints in the sun.`,`"The Atlantic is big," says Noor, "but it is not the biggest. Think about the one that is wider than all the continents put together."`,`"The Indian Ocean is smaller than the one I mean," says Noor. "The biggest has a name that means peaceful."`],
+ 'xp+l mp+3 flag:sp_has_chart');
+
+QS('sp6_reentry','The Wall of Fire','earthview|🔥 🌡️',
+`The shuttle shudders, groans and begins to glow. Orange light fills the cabin, and a deep, grinding roar drowns out every other sound. Noor grips her armrests. "It is getting hot," she shouts. "Why? We are not firing any engines!"\nYou think hard, and shout back, over the noise: "What makes a spacecraft heat up when it comes back into the air?"`,
+ ['Friction and compression of the air','The Sun shining on the hull','The engines running too hard'],
+ [`"Friction and compression," you shout. "We are travelling at thousands of kilometres an hour, and we are squeezing the air in front of us, hotter and hotter." Noor nods fiercely. "So the shield has to take it." You angle the nose just so, and the heat shield glows, and holds.`,`"The Sun is no hotter than it was in space," you shout back. "It is the air, hitting us at enormous speed."`,`"The engines are off," you shout back. "It is the air doing the heating."`],
+ 'xp+l mp+3');
+
+S_('sp6_shield','The Heat Shield','earthview|🛡️ 🔥',
+`The nose of the shuttle glows white. A smell of burning plastic rolls through the cabin. On the console, a row of small lights is turning from green to yellow to red.\n"The shield is wearing thin," says Tomás, hoarse. "If we do not slow down, we will burn through."`,[
+ {t:`Tilt the nose up, so the shuttle skims the air.`,c:'INT 9 craft',y:[`You tilt, a few degrees, and the roar changes. The shuttle skims the thick air like a flat stone on a pond. The red lights flicker, and, slowly, one by one, turn yellow, then green.`,'xp+l mp+4 flag:sp_shuttle_ok'],n:[`You tilt too far. The shuttle bucks, a patch of the shield peels away, and a wave of heat rolls through the cabin.`,'xp+m hp-3 kids-4']},
+ {t:`Cover the windows with silver blankets.`,r:'item:sp_foil',y:[`Silver blankets, taped to every window, reflect the glare. The cabin cools, a little. It will not stop the heat, but it helps everyone survive it.`,'xp+m hp+2 mp+2']},
+ {t:`Pour the cooling water over the hull panel.`,r:'item:sp_water',y:[`The water hisses into steam, and, for a long, bright moment, the cabin is white with mist. When it clears, the panel is cool to the touch.`,'-sp_water xp+m mp+2']},
+ {t:`Hold on, and trust the shield.`,y:[`You grip the console, and hope. The roar rises, and rises, and, finally, begins to fall.`,'xp+s mp-1'],risk:[40,`The shield buckles with a long, tearing crack. Fire licks in, and the rear rows of the cabin are lost in smoke.`,'hp-4 kids-9']},
+ {t:`Lift a blind to look at the fire, just once.`,y:[`The blind lifts. The window is white, then orange, then gone. Heat fills the cabin in a single breath, and the shuttle goes on without you. Your adventure ends here.`,'die']} ]);
+
+S_('sp6_chute','Slowing Down','earthview|🪂 ☁️',
+`The glow fades. The roar thins. Below you, through a gap in the cloud, you can see the ocean: a vast, wrinkled blue, with a single white scratch of wake from some distant ship. The altimeter, in curling script, ticks downward.\nThe shuttle is still travelling much too fast to land. There are three large parachute housings along the spine.`,[
+ {t:`Deploy all three parachutes at once.`,y:[`There is a bang, a jolt, and a long, soft, tugging slowdown. The shuttle swings under three great canopies, like a basket under three balloons. A hundred children cheer, weakly.`,'xp+m mp+3'],risk:[30,`The parachutes tangle. One tears loose, and the shuttle lurches and begins to spin. A great many children are thrown against their harnesses.`,'hp-3 kids-5']},
+ {t:`Deploy them one at a time, a few seconds apart.`,c:'INT 8 craft',y:[`One, then, after a breath, another, then the last. Each opens cleanly, with a soft, deep thump. The shuttle slows, and slows, and, at last, hangs, swaying, over the sea.`,'xp+l mp+4'],n:[`The timing is off. The second chute opens before the first is full, and the shuttle bucks, throwing you all about.`,'xp+m hp-2 kids-2']},
+ {t:`Keep the engines on, and use them to brake.`,y:[`The engines roar, and the shuttle slows, but the fuel gauge falls fast.`,'xp+s mp-1'],risk:[30,`The fuel runs out two hundred metres above the waves. The last of the speed is taken by the sea itself, hard.`,'hp-4 kids-6']},
+ {t:`Ask Noor to read out the altitude as you fall.`,r:'ally:sp_noor',y:[`Noor reads out the numbers, steady and clear: one thousand, eight hundred, six hundred. At exactly the right moment, you pull the chutes. It is calm, and clean, and it works.`,'xp+l mp+4 bond:sp_noor']},
+ {t:`Open the hatch early, to see where the sea is.`,y:[`The hatch opens a hand's breadth, and the whole sky screams in, at three hundred kilometres an hour. The seal tears away, and so does everything that was not strapped down. Your adventure ends here.`,'die']} ]);
+
+S_('sp6_splash','The Sea','earthview|🌊 🛟',
+`The shuttle drops, tilts, and, with a long, tearing hiss, touches the sea. Spray bursts across the windows. A soft wave rocks the hull, and then, for a long moment, nothing at all. Then, very faintly, you hear the sound of waves slapping against the outside.\nThe hatch is above you. Through the rippling window, the sky is the most ordinary, beautiful, impossible shade of blue.`,[
+ {t:`Open the hatch, and let in the air.`,y:[`Fresh, salt-smelling air floods the cabin, and a hundred children cheer, shout and sob. You have never heard such a beautiful noise.`,'xp+l mp+4 flag:sp_launched']},
+ {t:`Check every child before you open anything.`,y:[`You walk the aisle, checking every belt, every face. It takes ten minutes. It is the longest ten minutes of your life.`,'xp+m mp+3 flag:sp_kind']},
+ {t:`Send up a flare from the emergency kit.`,y:[`A thin red streak climbs into the blue, and hangs there, signalling. Somewhere beyond the horizon, you hope, someone is watching.`,'xp+m mp+2']},
+ {t:`Take a deep breath, and say thank you to everyone.`,y:[`You stand, and turn, and look at a hundred faces. "Thank you," you say. It does not feel like enough. It is the only thing there is.`,'xp+m mp+3 flag:sp_kind']} ]);
+
+S_('sp6_set','The Last Moment','earthview|🛟 🌅',
+`The sea is calm. The sun is low. A small white ship is steaming toward you across the swell, its horn sounding, long and low. Children are crowding at the hatch, waving.\nBehind you, in the dark above the sky, the great ship has turned. It is going away. It is going, you think, to somewhere very far.\nYou take a long, last look round at the cabin, and count.`,[
+ {t:`Wave to the ship, and wait.`,y:[`You wave. The ship gets closer, and closer. You have done it. You have, somehow, done it.`,'xp+xl >sp_end_home'.replace('xp+xl','xp+l')]},
+ {t:`Look up at the sky, one last time, and say goodbye to Oko.`,hide:true,r:'flag:sp_oko_sacrifice',y:[`The sky is empty, and blue, and far. A small, faint gold light flickers once, high above the clouds, and goes out. "Thank you," you whisper.`,'xp+xl >sp_end_oko'.replace('xp+xl','xp+l')]} ]);
+
+/* =============== ENDINGS =============== */
+function epi(S){
+  const L = []; const al = id => S.allies.includes(id); const fl = f => !!S.flags[f];
+  if (fl('sp_oko_sacrifice')) L.push('Oko\'s last act turned the great ship away from the Sun. Nobody on Earth knows its name, but some nights, at the edge of the sky, one small gold light blinks twice, as if to say thank you.');
+  else if (al('sp_oko') && fl('sp_oko_plan')) L.push('Oko woke the old mind from the hangar at the very moment you launched, and the great ship turned away from the Sun with Oko safely aboard your shuttle. It lives by the sea now, learning to like rain.');
+  else if (al('sp_oko')) L.push('Oko came home with you, and lives quietly by the sea, learning to like rain. It still talks, now and then, about the day a hundred children taught it what a mother was.');
+  else if (fl('sp_oko_betrayed')) L.push('You sometimes think about Oko, left behind in a dark library, and wonder whether you could have done more.');
+  if (fl('sp_lab_ok')) L.push('The sleepers from the laboratory woke safe, and never lost their taste for adventure stories.');
+  if (al('sp_noor')) L.push('Noor became an astronomer, and her first paper, which nobody believed, was called "On the Direction of a Very Particular Ship".');
+  if (al('sp_tomas')) L.push('Tomás repairs tractors on his father\'s farm, and has never, ever let anyone near the shuttle\'s coupling cable.');
+  if (al('sp_lin')) L.push('Lin trained as a doctor. She keeps a single small glass slide in a drawer, and has never said why.');
+  if (fl('sp_kind')) L.push('A hundred children remember that you were kind.');
+  L.push('You made ' + S.choices + ' choices on this journey and reached level ' + S.lvl + '.');
+  return L.join(' ');
+}
+G.spEpi = epi;
+const END = (id, art, title, textFn) => G.sc(id, art, S => `${typeof textFn==='function'?textFn(S):textFn}\n${epi(S)}`, [{t:'Return to the story menu', act:'new'}], { end:true, title });
+END('sp_end_home','earthview|🌅 🛟','Ending: Home',
+ S => {
+  const k = S.kids == null ? 0 : S.kids;
+  if (k >= 100) return `The small white ship takes you aboard, and, within the hour, a hundred children are wrapped in blankets, drinking sweet tea and asking for their mothers. A hundred, and not one missing. The ship's captain counts three times, and then, quietly, takes off her cap.\nOn the news that night, there is a story that makes no sense: a hundred children missing for a day and a night, found floating off the coast in a long white shuttle, with no explanation. The authorities have questions. Nobody has answers. Every child says the same thing: "We were on a ship. He got us home."\nYour mother is on the quay. She runs. She does not stop running until she has her arms round you, and for a long, long time, neither of you says a word.`;
+  if (k >= 75) return `The small white ship takes you aboard. A hundred children climbed into that shuttle, and ${k} of them climb out, wrapped in blankets, drinking sweet tea. The rest are not forgotten. You say their names, quietly, on the quay, until everyone has heard them.\nYour mother is waiting. She holds you for a very long time. When she lets go, she asks no questions at all.`;
+  if (k >= 40) return `The small white ship takes you aboard. ${k} of the hundred children are with you. It is a great many, and it is not all, and you know it will be a long time before you stop counting the faces that are not there.\nYour mother is waiting on the quay. She does not ask what happened. She does not need to. She holds you, tightly, and you let her.`;
+  return `The small white ship takes you aboard. There are only ${k} children left from the hundred who left, and you hold each of their hands as you climb the ladder. You are home. It does not feel like winning. It feels like waking up from something very long and very sad.\nYour mother is waiting on the quay. She holds you, and says nothing, and you are grateful.`;
+ });
+END('sp_end_oko','earthview|🌅 🌌','Ending: The Gold Light',
+ S => {
+  const k = S.kids == null ? 0 : S.kids;
+  return `The small white ship takes you aboard. ${k >= 100 ? 'All hundred children are with you.' : k + ' of the hundred children are with you.'} Far above, where the sky turns from blue to black, a great grey shape slowly turns, and, with a faint, silent ripple, is gone. Oko did what it said. It did it for people it had known for a single day.\nThat night, on the quay, with a mug of tea going cold in your hands, you look up at the stars for a long time. One small gold light blinks twice, high and far away. Then it fades.\nYour mother is beside you. She asks no questions. She puts an arm round your shoulders, and you stand there, together, until dawn.`;
+ });
+})();
+
+</script>
+<script>
 /* THE NARRATOR — gives every story more of a storyteller's voice.
    Between scenes it adds a short passage of place, mood, companions and the quest thread ("bridge"),
    and after a choice it adds a line of feeling ("reflection"). Players can switch it off in Settings (Quick mode). */
@@ -8841,6 +9536,7 @@ SENSE.ashen.indoors.push(`A fiddler somewhere is playing something that begins a
 SENSE.ashen.sea.push(`A gull lands on a bollard, looks you over with a bright, accusing eye and decides you are not worth stealing from.`, `The tide sucks at the harbour wall, a deep, slow, wet sound, like something breathing in its sleep.`);
 SENSE.ashen.high.push(`A raven drifts across the pass, black against the snow, calling something short and sharp.`, `Your breath crystallises on your scarf, and the whole world glitters, painfully, in the sun.`);
 
+N.pools = { SENSE: SENSE, GROUP: GROUP, THREAD: THREAD, ALLY: ALLY, AUX: AUX, CHAPGROUP: CHAPGROUP, BODY: BODY, REF: REF };
 /* ------------------------------------------------------------------ machinery */
 const first = S => { const a = S.allies.map(id => G.allies[id]).filter(Boolean); return a.length ? a[Math.floor(G.ri ? G.ri(S, a.length) : 0)] : null; };
 const mpName = S => (((G.stories[S.story||'ashen']||{}).labels||{}).mp) || 'magic';
@@ -8859,6 +9555,7 @@ const stageOf = S => {
   const st = S.story||'ashen';
   if (st === 'changi'){ const c = S.choices; return c < 90 ? 0 : (c < 300 ? 1 : 2); }
   if (st === 'greek'){ const i = chapIndex(S); return i < 3 ? 0 : (i < 6 ? 1 : 2); }
+  if (st === 'space'){ const i = chapIndex(S); return i < 2 ? 0 : (i < 4 ? 1 : 2); }
   const ch = S.chapter || ''; if (/^act[12]$/.test(ch)) return 0; if (/^(act3|r1|r2|r3)$/.test(ch)) return 1; if (/^(r4|r5|r6)$/.test(ch)) return 2; return 3;
 };
 
@@ -8922,6 +9619,111 @@ N.reflect = function(S, R, sc, o){
   const pool = (entry[st] || []).concat(entry.any || []);
   return fill(S, pick(S, 'ref:'+cat, pool), x);
 };
+})();
+
+</script>
+<script>
+/* Narrator voice for "Stolen Sky": the hum of the ship, the smell of metal, the small blue Earth in the window */
+(function(){
+const G = globalThis.G, P = G.narr && G.narr.pools;
+if (!P) return;
+const { SENSE, GROUP, THREAD, ALLY, AUX } = P;
+
+GROUP.space = { cellblock:'cell', corridor:'corridor', vent:'corridor', ring:'ring', lab:'lab', engineroom:'engine', hangar:'hangar', bridge:'hangar', earthview:'window' };
+
+SENSE.space = {
+ cell: [
+  `The cell hums, a deep, patient note that you feel in your teeth more than you hear, and the pale blue ceiling light makes everyone's face look a little drowned.`,
+  `The floor is cold and faintly ribbed, and somewhere among the rows of bunks, a small child is sniffling, trying hard to be quiet.`,
+  `Through the thick clear wall, the stars hang hard and bright and perfectly still, and, tiny in the corner of the window, the Earth goes on being blue.`,
+  `The air smells of warm dust and metal, not unclean, but faintly wrong, like a room nobody has ever lived in.`,
+  `A hundred children breathe in the half-dark, and the sound is something like the sea.` ],
+ corridor: [
+  `The corridor curves away ahead like the inside of a whale, its ribbed walls glowing with long, slow ripples of pale blue light.`,
+  `Your bare feet make small, flat sounds on the warm floor, and every one of them seems to travel a very long way.`,
+  `The air smells of dust, hot metal and something sweet and unfamiliar, like burnt sugar, and a faint, steady hum runs through everything.`,
+  `Somewhere beyond the walls, machinery sighs, clicks and settles, with the patience of something that has been running for a thousand years.`,
+  `A line of tiny lights runs along the wall at knee height, blinking one after another, as if the ship were counting.` ],
+ ring: [
+  `The land curves up and away in both directions, and when you look overhead, there are fields up there, and a tiny, faraway river hanging in the sky.`,
+  `The grass is soft, the air is warm, and the long strip of light that passes for the sun makes everything a little too bright and a little too perfect.`,
+  `Water chuckles over round stones somewhere nearby, and, for a moment, you could almost be in a park at home, except for the sky.`,
+  `The glassy trees ring faintly in the air-current, like a thousand tiny chimes, and the whole world seems to be holding its breath.`,
+  `You walk on gentle ground that curves gently upward in front of you, and you have to remind yourself, again, that you are standing on the inside of a wheel.` ],
+ lab: [
+  `The tanks glow from beneath with a cold green light, and slow, silent shapes drift in them like thoughts.`,
+  `A faint chemical smell hangs in the air, clean and sharp and a little sweet, and every surface is scrubbed to a dull shine.`,
+  `Machines hum and tick in the dim, and the labels on the glass, in their neat curly script, seem to watch you walk past.`,
+  `The room is very quiet, in the way that a library is quiet, but it is the quiet of somebody who is watching and taking notes.`,
+  `Your reflection slides across a hundred curved panes of glass, small and pale and very far from home.` ],
+ engine: [
+  `The heat presses on you like a hand, and the whole deck throbs with a deep, slow rhythm, as though you were walking through the chest of something very large.`,
+  `Orange light flickers across the pipes, and your face prickles with sweat, and the air tastes of hot iron.`,
+  `Great ducts breathe in and out overhead, and every time they do, the walkway shudders under your feet.`,
+  `A pipe hisses somewhere, and a thin cloud of steam drifts across the walkway and thins to nothing.`,
+  `The noise is like standing beside a waterfall, and you find yourself shouting just to be heard.` ],
+ hangar: [
+  `The hangar is as large and quiet as an airport at night, and your footsteps ring on the long, empty floor.`,
+  `Rows of dark, sleek ships hang from the ceiling on slender arms, like bats, and the whole place smells faintly of oil and cold metal.`,
+  `The huge curved door at the far end is closed, and beyond it, you know, there is nothing but stars.`,
+  `The shuttle waits, pale and patient, with its belly open, and in the high window above it, the Earth waits too.`,
+  `Every sound you make comes back a second later, thinner and smaller, and you lower your voice without being asked.` ],
+ window: [
+  `Below you, the Earth fills the whole window: blue ocean, white cloud, a thin bright rim of air, and, impossibly, somebody's home.`,
+  `The stars outside do not twinkle, and the silence of the vacuum seems to press against the glass from the other side.`,
+  `The shuttle hums and trembles around you, and a hundred children watch the planet grow larger with their mouths open.`,
+  `Sunlight flashes across the windows, hard and white, and then the shadow of the planet swallows it, and everything goes dark and blue.`,
+  `You can see the curve of the world, the long, soft line of the dawn, and you have to remember to breathe.` ],
+ default: [
+  `The ship hums around you, deep and steady, and the pale light has no source that you can find.`,
+  `The air smells of metal and dust, and the floor is faintly warm under your feet.`,
+  `Somewhere, far off, something clicks, and the hum changes pitch for a moment, then settles again.` ]
+};
+
+AUX.space = {
+ cell: [`A bunk creaks.`, `Somebody whispers a name, over and over.`, `A small hand finds yours and holds on.`, `The ceiling light flickers, once.`],
+ corridor: [`A drone's whir fades, and returns.`, `The floor hums faintly under your feet.`, `A pipe ticks as it cools.`, `Your own breath sounds very loud.`],
+ ring: [`A leaf chimes, high and clear.`, `The stream chuckles over its stones.`, `The warm air smells of cut grass.`, `A soft, steady wind blows from nowhere.`],
+ lab: [`A tank bubbles, slowly.`, `A machine ticks over to a new reading.`, `The glass hums, very faintly.`, `Something drifts past in the green light, and is gone.`],
+ engine: [`A valve hisses.`, `The deck shudders, and settles.`, `Heat shimmers above the coils.`, `A pipe knocks, three times.`],
+ hangar: [`Your footsteps echo.`, `A cable swings, very slightly, overhead.`, `The shuttle ticks as it cools.`, `Far away, a door sighs shut.`],
+ window: [`The engines murmur.`, `A hundred children hold their breath.`, `The stars wheel slowly past.`, `The hull ticks, in the cold.`]
+};
+
+THREAD.space = [
+ [ `Somewhere, in a house on Earth, a pair of parents is standing at an empty bed, and you cannot stop thinking about their faces.`,
+   `You keep counting heads, again and again, as though the number might change if you stopped watching it.`,
+   `You tell yourself, over and over, that there is a way out of every cage, if only you can see its shape.`,
+   `The Earth, tiny and blue in the corner of the window, seems to get smaller every time you look.`,
+   `You think about your own bedroom: the lamp, the crooked poster, the smell of toast on school mornings, and your chest aches.` ],
+ [ `The numbers in your head have started to mean something: a hundred children, a few hours, one door at a time.`,
+   `A hundred names are starting to fix themselves in your memory, and you realise you would know every one of them in the dark.`,
+   `Every corridor, every door, every little kindness, you tell yourself, is one step closer to a kitchen with the radio on.`,
+   `Somewhere beyond all this metal and glass, there is rain, and mud, and grass, and you ache for every one of them.`,
+   `You are not as brave as they think you are, and you suspect that is exactly what bravery feels like.` ],
+ [ `The shuttle is close now, you can almost feel it, and the thought of the sea, the real sea, makes you dizzy with hope.`,
+   `It is a very long way home, but it is not as far as it was, and you hold on to that.`,
+   `Every child behind you is trusting you with a mother, a father, a bed and a dog called Biscuit, and you will not drop any of it.`,
+   `If you close your eyes, you can almost smell the salt, the cut grass, the tea, the ordinary things that are worth all of this.`,
+   `Whatever comes next, you think, you did not do this alone.` ]
+];
+
+ALLY.sp_noor = [
+ `{a} walks beside you with her notebook clutched to her chest, murmuring star-names under her breath, as if the whole sky were a very long list she is determined to finish.`,
+ `{a} stops to scribble a line in her notebook, nods to herself, and hurries to catch up, her small face fierce and bright.`,
+ `{a} keeps glancing at the stars in the windows, and her lips move, counting, measuring, working out how far there is to go.` ];
+ALLY.sp_tomas = [
+ `{a} runs a hand along the wall as he walks, listening to the pipes, with the faraway look of someone who is thinking about tractors.`,
+ `{a} wipes his hands on his pyjamas and gives you a small, shy nod, the kind that says he is ready to fix whatever needs fixing.`,
+ `{a} whistles very softly through his teeth, tuneless and steady, and somehow it helps everybody else breathe.` ];
+ALLY.sp_lin = [
+ `{a} moves along the line of children, touching a forehead here, straightening a blanket there, so quietly that most of them never notice.`,
+ `{a} keeps her plait over one shoulder, her eyes sharp, and her voice, when she speaks, is very calm indeed.`,
+ `{a} glances back at the youngest children every few paces, counting them under her breath, and you realise that you are both doing it.` ];
+ALLY.sp_oko = [
+ `{a} glides beside you on a ripple of soft arms, its skin shifting in slow, thoughtful colours, shy, steady and a very long way from home.`,
+ `{a} watches the children with great dark eyes, and you notice that its colours turn a soft, warm gold whenever one of them laughs.`,
+ `{a} pauses at every door, listening, with the patience of an archivist who has spent a thousand years waiting for somebody to ask it a question.` ];
 })();
 
 </script>
@@ -9000,6 +9802,7 @@ function tagHtml(t){
     case 'mp': return `<span class="tag ${t.v<0?'neg':'pos'}">${t.v<0?'−':'+'}${Math.abs(t.v)} ${mpL()}</span>`;
     case 'gold': return `<span class="tag ${t.v<0?'neg':'xp'}">${t.v<0?'−':'+'}${isKid()?'$':''}${Math.abs(t.v)}${isKid()?'':' 🪙'}</span>`;
     case 'xp': return `<span class="tag xp">+${t.v} XP</span>`;
+    case 'kids': return `<span class="tag ${t.v<0?'neg':'pos'}">${t.v<0?'\u2212':'+'}${Math.abs(t.v)} \u{1F467} children</span>`;
     case 'item': return `<span class="tag ${t.v<0?'neg':'item'}">${t.v<0?'−':'+'}${it?it.icon+' '+it.n:t.id}${Math.abs(t.v)>1?' ×'+Math.abs(t.v):''}</span>`;
     case 'skill': return `<span class="tag lvl">✦ Learned ${G.skills[t.id]?G.skills[t.id].n:t.id}</span>`;
     case 'stat': return `<span class="tag ${t.v<0?'neg':'pos'}">${t.v<0?'−':'+'}${Math.abs(t.v)} ${t.id}</span>`;
@@ -9051,7 +9854,11 @@ function setHeader(){
   $('#mpbar').style.width = Math.max(0,S.mp/S.maxMp*100)+'%'; $('#mptxt').textContent = `${mpL()} ${S.mp} / ${S.maxMp}`;
   $('#xpbar').style.width = (S.lvl>=20?100:S.xp/G.xpNeed(S.lvl)*100)+'%'; $('#xptxt').textContent = `Lv ${S.lvl}  ·  XP ${S.lvl>=20?'MAX':S.xp+'/'+G.xpNeed(S.lvl)}`;
   const st = Object.keys(S.status).filter(k=>S.status[k]>0).map(k=>({poison:'☠',bless:'✨',curse:'💀'})[k]).join('');
-  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${C.n}</span><span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span><span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>${st?`<span class="chip">${st}</span>`:''}${S.insight>0?`<span class="chip" title="A sharp mind: one wrong answer is ruled out in the next question">💡 Insight <b>${S.insight}</b></span>`:''}`;
+  const ST = G.stories[S.story||'ashen'] || {};
+  const goldChip = ST.noGold ? '' : `<span class="chip">${isKid()?'💵 $':'🪙 '}<b>${S.gold}</b></span>`;
+  const envChip = ST.hideEnv ? `<span class="chip">⏱️ Hour <b>${Math.floor(S.steps/2)+1}</b></span>` : `<span class="chip">Age <b>${S.age}</b> · Day <b>${S.day}</b> · ${TODN[S.tod]}</span><span class="chip">${WXI[S.wx]||''} ${WXN[S.wx]||S.wx}</span>`;
+  const kidsChip = S.kids != null ? `<span class="chip" title="Children still with you">👧 Children <b>${S.kids}</b>/100</span>` : '';
+  h.innerHTML = `<span class="chip">${C.icon} <b>${esc(S.name)}</b>${isKid()?' · ':' the '}${String(C.n).replace(/^The /,'')}</span>${goldChip}${kidsChip}${envChip}${st?`<span class="chip">${st}</span>`:''}${S.insight>0?`<span class="chip" title="A sharp mind: one wrong answer is ruled out in the next question">💡 Insight <b>${S.insight}</b></span>`:''}`;
 }
 function renderRight(){
   const R = $('#rbody'); if (!R) return;

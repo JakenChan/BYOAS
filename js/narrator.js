@@ -413,6 +413,7 @@ SENSE.ashen.indoors.push(`A fiddler somewhere is playing something that begins a
 SENSE.ashen.sea.push(`A gull lands on a bollard, looks you over with a bright, accusing eye and decides you are not worth stealing from.`, `The tide sucks at the harbour wall, a deep, slow, wet sound, like something breathing in its sleep.`);
 SENSE.ashen.high.push(`A raven drifts across the pass, black against the snow, calling something short and sharp.`, `Your breath crystallises on your scarf, and the whole world glitters, painfully, in the sun.`);
 
+N.pools = { SENSE: SENSE, GROUP: GROUP, THREAD: THREAD, ALLY: ALLY, AUX: AUX, CHAPGROUP: CHAPGROUP, BODY: BODY, REF: REF };
 /* ------------------------------------------------------------------ machinery */
 const first = S => { const a = S.allies.map(id => G.allies[id]).filter(Boolean); return a.length ? a[Math.floor(G.ri ? G.ri(S, a.length) : 0)] : null; };
 const mpName = S => (((G.stories[S.story||'ashen']||{}).labels||{}).mp) || 'magic';
@@ -431,6 +432,7 @@ const stageOf = S => {
   const st = S.story||'ashen';
   if (st === 'changi'){ const c = S.choices; return c < 90 ? 0 : (c < 300 ? 1 : 2); }
   if (st === 'greek'){ const i = chapIndex(S); return i < 3 ? 0 : (i < 6 ? 1 : 2); }
+  if (st === 'space'){ const i = chapIndex(S); return i < 2 ? 0 : (i < 4 ? 1 : 2); }
   const ch = S.chapter || ''; if (/^act[12]$/.test(ch)) return 0; if (/^(act3|r1|r2|r3)$/.test(ch)) return 1; if (/^(r4|r5|r6)$/.test(ch)) return 2; return 3;
 };
 

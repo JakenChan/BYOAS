@@ -89,6 +89,7 @@ function atom(S, parts){
     case 'wx': return S.wx === v;
     case 'status': return (S.status[v]||0) > 0;
     case 'insight': return (S.insight||0) > 0;
+    case 'kids': return (S.kids == null ? 0 : S.kids) >= +v;
     case 'cp': return !!S.cp;
     case 'stat': return S.stats[v] >= +parts[2];
     case 'sv': return !!S.sv[v];
@@ -108,6 +109,7 @@ function why(neg, parts){
     case 'flag': return G.deeds[v] ? 'Needs deed: ' + G.deeds[v] : 'Needs a past deed';
     case 'ally': return 'Needs ' + (G.allies[v]?G.allies[v].n:v) + ' beside you';
     case 'anyally': return 'Needs a companion';
+    case 'kids': return 'Needs ' + v + ' children with you';
     case 'bond': return 'Needs a stronger bond with ' + (G.allies[v]?G.allies[v].n:v);
     case 'gold': return G.curStory==='changi' ? 'Needs $' + v : 'Needs ' + v + ' gold';
     case 'mp': return 'Needs ' + v + ' ' + mpName();
@@ -151,6 +153,7 @@ G.newState = function(cfg){
   (O.flags||[]).forEach(f => S.flags[f]=true);
   S.flags['origin_'+cfg.origin] = true;
   S.dmgMul = ({story:0.6, normal:1, grim:1.35})[cfg.diff||'normal']; S.diff = cfg.diff||'normal';
+  if ((G.stories[S.story]||{}).kids) S.kids = 100;
   G.curStory = S.story; S.chi = 0; S.queue = [];
   G.nextBeat(S);
   return S;
@@ -363,6 +366,7 @@ function applyFx(S, fx, R, o){
       if (rnd(S) < 0.5){ const pen = ['hp-2','mp-3', S.story==='ashen' ? 'gold-s' : 'gold-3'][Math.floor(rnd(S)*3)]; applyFx(S, pen, R, o); R.text += ' That slip cost you.'; }
       else R.text += ' No harm done, this time.';
     }
+    else if ((m = /^kids([+-])(\d+)$/.exec(tok))){ const cur = S.kids == null ? 100 : S.kids; const nv = Math.max(0, Math.min(100, cur + (m[1]==='-' ? -1 : 1) * (+m[2]))); if (nv !== cur){ S.kids = nv; R.tags.push({k:'kids', v:nv-cur}); } }
     else throw new Error('unknown fx token: '+tok);
   }
 }
@@ -606,7 +610,7 @@ G.perkDef = function(S){
   if (s2) opts.push({ t:`Study a new skill: ${G.skills[s2].icon} ${G.skills[s2].n}`, y:[`It takes weeks of stubborn practice, but you learn ${G.skills[s2].n}. ${G.skills[s2].d}`, `skill:${s2}`] });
   opts.push({ t:'Rest on your laurels: +6 max HP and +3 max MP', y:['You eat well, sleep deeply, and feel your reserves swell.', 'maxhp+6 maxmp+3'] });
   const kid = S.story==='changi';
-  return { id:'perk', art:(kid?'park|⭐':'camp|⭐'), title:`Level ${S.lvl}: Growth`, text: kid ? `You feel a little braver, a little wiser, a little taller. You are now level ${S.lvl}. What would you like to get better at?` : `You have grown stronger. Something in you has settled into a new shape — you are now level ${S.lvl}. A moment of quiet lets you decide who you are becoming.`, opts, noWx:true };
+  return { id:'perk', art:((G.stories[S.story]||{}).perkArt || (kid?'park|⭐':'camp|⭐')), title:`Level ${S.lvl}: Growth`, text: kid ? `You feel a little braver, a little wiser, a little taller. You are now level ${S.lvl}. What would you like to get better at?` : `You have grown stronger. Something in you has settled into a new shape — you are now level ${S.lvl}. A moment of quiet lets you decide who you are becoming.`, opts, noWx:true };
 };
 
 /* ---------------- BATTLE ---------------- */
