@@ -486,6 +486,11 @@ G.resolveCur = function(S){
 function finish(S, sc){
   if (S.intro && (sc.kind==='static' || sc.kind==='gen') && !sc.end && G.chapters[S.intro]){ const ch = G.chapters[S.intro];
     sc.text = fmt(S, (ch.sub ? '«'+ch.sub+'»\n' : '') + ch.text) + '\n' + sc.text; sc.introTitle = ch.n; }
+  else if (G.narrOn !== false && G.narr && S.out && S.out.from !== sc.id && (sc.kind==='static' || sc.kind==='gen') && !sc.end && !sc.card && sc.id !== 'perk' && !S.dead){
+    const k = sc.id + '#' + S.choices + '#' + S.steps;
+    if (!S.bridge || S.bridge.k !== k) S.bridge = { k: k, t: G.narr.bridge(S, sc) };
+    if (S.bridge.t) sc.text = S.bridge.t + '\n' + sc.text;
+  }
   if (!sc.opts.some(o=>o.avail)) sc.opts.push({ raw:{y:['','']}, label:'Press on', avail:true, safe:true, req:null });
   for (const o of sc.opts){ if (!o.hide || o.avail) continue; o.gone = true; }
   sc.opts = sc.opts.filter(o=>!o.gone);
@@ -573,7 +578,8 @@ G.choose = function(S, idx){
   let counted = sc.count && (!R.stay || R.countStay);
   if (counted) S.choices++;
   if (counted && S.insight > 0) S.insight--;
-  S.out = { n: S.choices, chosen: o.label, text: R.text, tags: R.tags, roll: R.roll, ok: R.ok, lines: R.lines };
+  if (G.narrOn !== false && G.narr && !R.die && !R.stay && !S.battle){ const rf = G.narr.reflect(S, R, sc, o); if (rf) R.text += (R.text ? ' ' : '') + rf; }
+  S.out = { n: S.choices, chosen: o.label, text: R.text, tags: R.tags, roll: R.roll, ok: R.ok, lines: R.lines, from: sc.id, risked: !!R.risked };
   S.log.push({ n: counted?S.choices:0, sc: sc.title, c: o.label, t: R.text.length>260?R.text.slice(0,257)+'…':R.text, tags: R.tags.slice(0,10), roll: R.roll?{r:R.roll.r,tot:R.roll.total,dc:R.roll.dc,s:R.roll.stat,ok:R.roll.ok}:null, ok:R.ok });
   if (R.die){ S.dead = true; S.deathText = (R.deathText || R.text) + (R.hpDeath ? ' ' + G.deathLine(S) : ''); S.cur = {kind:'death'}; S.battle = null; return { dead:true }; }
   if (R.ending){ S.ending = R.ending; }

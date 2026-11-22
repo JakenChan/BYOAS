@@ -278,11 +278,13 @@ function openSettings(){
   modal(`<h2>Voice &amp; narration</h2>
   <div class="row2"><label><input type="checkbox" id="sOn" ${SP.on?'checked':''}> Narrate the story aloud</label></div>
   <div class="row2"><label><input type="checkbox" id="sOpts" ${SP.opts?'checked':''}> Also read the choices aloud</label></div>
+  <div class="row2"><label><input type="checkbox" id="sRich" ${G.narrOn!==false?'checked':''}> Storyteller's narration: scene-setting and feelings between scenes (untick for Quick mode)</label></div>
   <div class="row2">Voice: <select id="sVoice">${voices.map(v=>`<option value="${esc(v.name)}" ${chooseVoice()&&chooseVoice().name===v.name?'selected':''}>${esc(v.name)} (${v.lang})</option>`).join('') || '<option>(browser default)</option>'}</select></div>
   <div class="row2">Speed: <input type="range" id="sRate" min="0.6" max="1.6" step="0.05" value="${SP.rate}"> <span id="sRateV">${SP.rate.toFixed(2)}</span></div>
   <div class="row2"><button class="voice" id="sTest" style="padding:6px 14px;background:#0f0c0a;border:1px solid #e0a93e;border-radius:8px">▶ Test voice</button> <button id="sClose" style="padding:6px 14px;background:#2a2118;border:1px solid #4a3a2b;border-radius:8px">Close</button></div>`);
   $('#sOn').onchange = e=>{ SP.on=e.target.checked; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); updateVoiceBtns(); };
   $('#sOpts').onchange = e=>{ SP.opts=e.target.checked; LS.set('aq_read_opts',SP.opts?'1':'0'); updateVoiceBtns(); };
+  $('#sRich').onchange = e=>{ G.narrOn = e.target.checked; LS.set('aq_rich', G.narrOn?'1':'0'); };
   $('#sVoice').onchange = e=>{ SP.voiceName=e.target.value; LS.set('aq_voice_name',SP.voiceName); };
   $('#sRate').oninput = e=>{ SP.rate=parseFloat(e.target.value); LS.set('aq_rate',SP.rate); $('#sRateV').textContent=SP.rate.toFixed(2); };
   $('#sTest').onclick = ()=>{ const was=SP.on; SP.on=true; runUnits([{text:'The road is long, and the dark is patient — but so are you.', el:null}]); SP.on=was; };
@@ -378,6 +380,7 @@ window.addEventListener('DOMContentLoaded', () => {
   /* mobile browsers only allow speech after a tap: unlock it with a silent utterance on the first touch / click */
   const unlock = () => { if (!synth) return; try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); }catch(e){} if (SP.on && SP.pending && mode==='play') setTimeout(()=>runUnits(SP.pending), 200); };
   ['touchend','click'].forEach(ev => document.addEventListener(ev, unlock, { once:true, passive:true }));
+  G.narrOn = LS.get('aq_rich') !== '0';
   updateVoiceBtns(); toTitle();
 });
 window.AQ = { get S(){ return S; }, renderGame, toTitle, save, setState(x){ S=x; renderGame(true); }, setTab(t){ tab=t; renderRight(); } };
