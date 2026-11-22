@@ -189,7 +189,7 @@ function renderScreen(sc, opts){
   const nodes = []; units.forEach(u => { const el = document.getElementById(u.id); nodes.push({ text:u.text, el }); });
   if (SP.opts){ av.forEach((o,i) => nodes.push({ text:`Choice ${i+1}. ${o.label}`, el: $('#opts').querySelectorAll('button.opt')[i] })); }
   SP.pending = nodes;
-  if (!opts.silent) runUnits(nodes);
+  if (!opts.silent && mode==='play') runUnits(nodes);
 }
 
 function outcomeBlock(out, hideText){
@@ -236,7 +236,7 @@ document.addEventListener('keydown', e => {
   if (/^Numpad[1-9]$/.test(e.code)) n = +e.code.slice(6); else if (/^Digit[1-9]$/.test(e.code)) n = +e.code.slice(5);
   if (n){ e.preventDefault(); if (modalOpen==='use'){ useByNumber(n-1); return; } if (modalOpen) return; pickIndex(n-1); return; }
   const k = e.key.toLowerCase();
-  if (e.code==='Numpad0' || k==='r'){ e.preventDefault(); if (!modalOpen && CUR) runUnits(SP.pending||[]); return; }
+  if (e.code==='Numpad0' || k==='r'){ e.preventDefault(); if (!modalOpen && CUR && mode==='play') runUnits(SP.pending||[]); return; }
   if (e.code==='NumpadDecimal' || k===' ' || k==='enter'){ e.preventDefault(); if (SP.speaking) stopSpeech(); else if (!modalOpen && CUR && CUR.opts.filter(o=>o.avail).length===1 && k==='enter') pickIndex(0); return; }
   if (k==='m'){ SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); updateVoiceBtns(); return; }
   if (k==='o'){ SP.opts=!SP.opts; LS.set('aq_read_opts',SP.opts?'1':'0'); updateVoiceBtns(); return; }
@@ -368,7 +368,7 @@ function stepConfirm(){
 
 /* ===================== BOOT ===================== */
 window.addEventListener('DOMContentLoaded', () => {
-  $('#bVoice').onclick = () => { SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); else if (SP.pending) runUnits(SP.pending); updateVoiceBtns(); };
+  $('#bVoice').onclick = () => { SP.on=!SP.on; LS.set('aq_voice_on',SP.on?'1':'0'); if(!SP.on) stopSpeech(); else if (SP.pending && mode==='play') runUnits(SP.pending); updateVoiceBtns(); };
   $('#bOpts').onclick = () => { SP.opts=!SP.opts; LS.set('aq_read_opts',SP.opts?'1':'0'); updateVoiceBtns(); };
   $('#bMenu').onclick = openMenu;
   $('#bSkip').onclick = stopSpeech;
