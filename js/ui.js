@@ -312,7 +312,6 @@ function toTitle(){
   const opts = storyIds().map(id => { const st=G.stories[id]; const saved=!!LS.get(sk('aq_save',id));
     return mk('', ()=>storyMenu(id), { html:`<b>${st.icon} ${esc(st.title)}</b>${saved?' <span class="m safe">saved game</span>':''}<span class="sub">${esc(st.tag)}</span><span class="sub2">${esc(st.desc)}</span>` }); });
   opts.push(mk('Voice & narration settings', openSettings));
-  opts.push(mk('How to play', openHelp));
   renderScreen({ art:'title|📖', title:'Build Your Own Adventure Story Building', card:true, opts, wxline:false, text:
     'BYOA by Jaken\nWELCOME, STORYTELLER\nPick an adventure. Every story has its own hero, places, items, dangers and endings, and every choice you make is recorded as you go.\nChoose with the number keys.' }, { silent:false });
   renderRight();
